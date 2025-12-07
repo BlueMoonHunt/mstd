@@ -1,15 +1,7 @@
 #ifndef MSTD_IMPLEMENTATION
 #define MSTD_IMPLEMENTATION
 
-#include "core/mstd_types.h"
-#include "core/mstd_mem.h"
-
-#if defined(__INTELLISENSE__) || defined(__RESHARPER__) || defined(__clang_analyzer__)
-    #define MSTD_USE_OS
-    #define MSTD_USE_ARENA
-    #define MSTD_USE_MEMORY
-#endif
-
+#include "core/mstd_core.h"
 
 #if defined(MSTD_USE_ARENA)
     #ifndef MSTD_USE_OS
