@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include <assert.h>
 
-
-
 #if defined(_MSC_VER)
     #define COMPILER_MSVC 1
     #define COMPILER_GCC 0
@@ -62,6 +60,9 @@
     #warning "Unknown Architecture"
 #endif
 
+////////////////////////////////
+// types
+
 typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -84,6 +85,10 @@ typedef double f64;
 
 #define enum_class(type, size_type) size_type
 
+////////////////////////////////
+// math and utils
+#define align_as _Alignas
+#define align_of _Alignof
 #define align_up_pow2(x,b)   (((x) + (b) - 1)&(~((b) - 1)))
 #define align_down_pow2(x,b) ((x)&(~((b) - 1)))
 #define align_up_pad_pow2(x,b)  ((0-(x)) & ((b) - 1))
@@ -102,12 +107,25 @@ typedef double f64;
 #define GB(value) ((value) << 30)
 #define TB(value) ((value) << 40)
 
+#define max(a,b) (((a) > (b))? a : b)
+#define min(a,b) (((a) < (b))? a : b)
+#define clamp(low,high,value) max(low,min(value,high))
+
+////////////////////////////////
+// memory
+
 b32 mem_is_pow2(uaddress address);
 b32 mem_is_aligned(void* data, u64 alignment);
 b32 mem_compare(void* data1, void* data2, u64 count);
 void mem_copy(void* destination, void* source, u64 size);
 void mem_set(void* data, u8 value, u64 size);
 #define mem_zero(data, size) mem_set(data, 0, size)
+
+typedef struct mem mem;
+struct mem { uaddress address; u64 size; };
+
+////////////////////////////////
+// strings: u8 u16
 
 typedef struct string8 string8;
 struct string8 {
