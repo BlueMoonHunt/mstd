@@ -1,5 +1,5 @@
 #include "mstd_core.h"
-#include "mstd_arena.h"
+#include <arena/mstd_arena.h>
 
 b32 char_is_space(u8 c) {
     return (c == ' ' || c == '\n' || c == '\t' || c == '\r' || c == '\f' || c == '\v');
@@ -35,13 +35,13 @@ u8 char_to_upper(u8 c) {
     return (char_is_lower(c) ? c + ('A' - 'a') : c);
 }
 
-u64 cstr8_length(const u8* c) {
+u64 cstr8_length(u8* c) {
     u8* p = c;
     for (;*p != 0; p++);
     return (p - c);
 }
 
-u64 cstr16_length(const u16* c) {
+u64 cstr16_length(u16* c) {
     u16* p = c;
     for (;*p != 0; p++);
     return (p - c);
@@ -102,8 +102,8 @@ str8 str8_to_upper(Arena* arena, const str8 str) {
 str8 str8_concat(Arena* arena, const str8 a, const str8 b) {
     str8 result = { .size = a.size + b.size };
     result.str = arena_push_array(arena, u8, result.size + 1);
-    MemoryCopy(result.str, a.str, b.size);
-    MemoryCopy(result.str + a.size, b.str, b.size);
+    mem_copy(result.str, a.str, b.size);
+    mem_copy(result.str + a.size, b.str, b.size);
     result.str[result.size] = 0;
     return result;
 }

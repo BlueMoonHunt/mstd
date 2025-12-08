@@ -2,6 +2,7 @@
 #define TYPES_IMPLEMENTATION
 #include <stdint.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #if defined(_MSC_VER)
     #define COMPILER_MSVC 1
@@ -107,10 +108,6 @@ typedef double f64;
 #define GB(value) ((value) << 30)
 #define TB(value) ((value) << 40)
 
-#define max(a,b) (((a) > (b))? a : b)
-#define min(a,b) (((a) < (b))? a : b)
-#define clamp(low,high,value) max(low,min(value,high))
-
 ////////////////////////////////
 // memory
 
@@ -144,8 +141,8 @@ b32 char_is_alphabet(u8 c);
 b32 char_is_digit(u8 c, u32 base);
 u8 char_to_lower(u8 c);
 u8 char_to_upper(u8 c);
-u64 cstr8_length(const u8 *c);
-u64 cstr16_length(const u16 *c);
+u64 cstr8_length(u8 *c);
+u64 cstr16_length(u16 *c);
 
 str8 _str8(u8* str, u64 size);
 str16 _str16(u16* str, u64 size);

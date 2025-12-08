@@ -8,7 +8,7 @@ struct OSInfo {
     u64 page_size;
     u64 large_page_size;
     u64 allocation_granularity;
-    string8 machine_name;
+    str8 machine_name;
 };
 
 u64 os_get_page_size();
