@@ -1,4 +1,5 @@
-#include "mstd_os.h"
+#include "mstd.h"
+#define NOMINMAX
 #include <Windows.h>
 
 u64 os_get_page_size() {
