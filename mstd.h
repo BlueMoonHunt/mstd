@@ -190,7 +190,7 @@ str8 _str8(u8* str, u64 size);
 str16 _str16(u16* str, u64 size);
 
 #define str8(literal) _str8((u8*)(literal), sizeof(literal) - 1)
-#define str16(literal) _str16((u16*)(literal), sizeof(literal) - 1)
+#define str16(literal) _str16((u16*)(literal), sizeof(literal) >> 1 - 1)
 
 str8 str8_from_cstr(const char* str);
 str16 str16_from_cstr(const u16* str);
