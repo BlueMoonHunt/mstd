@@ -69,9 +69,10 @@ typedef double f64;
     typedef __uint128_t u128;
 #elif defined(_MSC_VER) && defined(_M_X64)
     typedef struct {
-        alignas(16) u64 low;
-        alignas(16) u64 high;
-    } u128;
+        u64 low;
+        u64 high;
+    } _u128;
+    #define u128 alignas(16) _u128
 #else
     #error "No supported 128-bit integer implementation found."
 #endif

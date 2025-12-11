@@ -8,7 +8,7 @@ inline void random_update_pcg_state(RandomNumberGenerator* rng) {
     u128 A = (u128){ .high = rng->state.high, .low = rng->state.low };
     u128 P = {0};
 
-    u64 P_00_low, P_00_carry;
+    u64 P_00_carry;
     u64 P_10_low, P_10_carry;
     u64 P_01_low, P_01_carry;
 
