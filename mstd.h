@@ -227,11 +227,14 @@ u8 char_to_upper(u8 c);
 u64 cstr8_length(u8* c);
 u64 cstr16_length(u16* c);
 
-str8 _str8(u8* str, u64 size);
-str16 _str16(u16* str, u64 size);
+str8 _str8_create(u8* str, u64 size);
+str16 _str16_create(u16* str, u64 size);
 
-#define str8(literal) _str8((u8*)(literal), sizeof(literal) - 1)
-#define str16(literal) _str16((u16*)(literal), sizeof(literal) >> 1 - 1)
+str8 str8_of_size(u64 size, Arena* arena);
+str16 str16_of_size(u64 size, Arena* arena);
+
+#define s8_literal(literal) _str8_create((u8*)(literal), sizeof(literal) - 1)
+#define s16_literal(literal) _str16_create((u16*)(literal), sizeof(literal) >> 1 - 1)
 
 str8 str8_from_cstr(const char* str);
 str16 str16_from_cstr(const u16* str);

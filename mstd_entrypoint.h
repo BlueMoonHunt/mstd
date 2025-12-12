@@ -2,7 +2,11 @@
 
 int mstd_main(int argc, char* argv[]); // To be declared by user
 
-#if defined(OS_WINDOWS) && defined(MSTD_USE_GUI_ENTRYPOINT)
+#if defined(MSTD_USE_GUI_ENTRYPOINT)
+    #include "mstd_graphics.c"
+#endif
+
+#if defined(OS_WINDOWS)
 #define NOMINMAX
 #include <Windows.h>
 #include <stdio.h>

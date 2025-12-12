@@ -3,6 +3,8 @@
 #include <Windows.h>
 #include <bcrypt.h>
 
+#pragma comment(lib, "bcrypt")
+
 SystemInfo* os_get_system_info(Arena* arena) {
     SystemInfo* s_info = arena_push_struct(arena, SystemInfo);
     if (!s_info) return NULL;

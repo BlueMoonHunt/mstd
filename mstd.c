@@ -83,14 +83,30 @@ u64 cstr16_length(u16* c) {
     return (p - c);
 }
 
-str8 _str8(u8* str, u64 size) {
+str8 _str8_create(u8* str, u64 size) {
     str8 result = { .str = str, .size = size };
     return result;
 }
 
-str16 _str16(u16* str, u64 size) {
+str16 _str16_create(u16* str, u64 size) {
     str16 result = { .str = str, .size = size };
     return result;
+}
+
+str8 str8_of_size(u64 size, Arena* arena) {
+    assert(arena);
+    str8 str = {.size = size};
+    str.str = arena_push_array(arena, u8, size + 1);
+    str.str[str.size] = 0;
+    return str;
+}
+
+str16 str16_of_size(u64 size, Arena* arena) {
+    assert(arena);
+    str16 str = { .size = size };
+    str.str = arena_push_array(arena, u16, str.size + 1);
+    str.str[str.size] = 0;
+    return str;
 }
 
 str8 str8_from_cstr(const char* str) {
@@ -105,19 +121,17 @@ str16 str16_from_cstr(const u16* str) {
 
 str8 str8_copy(Arena* arena, const str8 str) {
     assert(arena && str.str);
-    str8 str_new = { .size = str.size };
-    str_new.str = arena_push_array(arena, u8, str.size + 1);
+    str8 str_new = str8_of_size(str.size, arena);
     mem_copy(str_new.str, str.str, str.size);
-    str_new.str[str.size] = 0;
+    str.str[str.size] = 0;
     return str_new;
 }
 
 str16 str16_copy(Arena* arena, const str16 str) {
     assert(arena && str.str);
-    str16 str_new = { .size = str.size };
-    str_new.str = arena_push_array(arena, u16, str.size + 1);
+    str16 str_new = str16_of_size(str.size, arena);
     mem_copy(str_new.str, str.str, str.size);
-    str_new.str[str.size] = 0;
+    str_new.str[str_new.size] = 0;
     return str_new;
 }
 
