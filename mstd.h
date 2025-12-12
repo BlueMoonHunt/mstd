@@ -3,11 +3,13 @@
 
 #ifdef __cplusplus
 extern "C" {
+    #include <cstdalign>
+#else
+    #include <stdalign.h>
 #endif
 
 #include <stdint.h>
 #include <assert.h>
-#include <stdalign.h>
 
 #if defined(_MSC_VER)
 #define COMPILER_MSVC 1
@@ -66,14 +68,14 @@ typedef double f64;
 
 #if defined(__clang__) || defined(__GNUC__)
     typedef __uint128_t u128;
-#elif defined(_MSC_VER) && defined(_M_X64)
+#elif defined(COMPILER_MSVC) && defined(_M_X64)
     typedef struct {
         u64 low;
         u64 high;
     } _u128;
     #define u128 alignas(16) _u128
 #else
-    #error "No supported 128-bit integer implementation found."
+#warning "No supported 128-bit integer implementation found."
 #endif
 
 ////////////////////////////////
