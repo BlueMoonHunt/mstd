@@ -5,7 +5,7 @@
 #define PCG_MULT_HIGH 0x2360ED051FC65DA4ULL
 
 inline void random_update_pcg_state(RandomNumberGenerator* rng) {
-    u128 A = (u128){ .high = rng->state.high, .low = rng->state.low };
+    u128 A = { .low = rng->state.low, .high = rng->state.high};
     u128 P = {0};
 
     u64 P_00_carry;
@@ -38,4 +38,12 @@ u64 random_in_range(u64 low, u64 high, RandomNumberGenerator* rng) {
         low_product = _umul128(x, range, &high_product);
     } while (low_product < threshold);
     return high_product + low;
+}
+
+inline uint64_t rotate_right_u64(uint64_t value, unsigned int shift) {
+#if defined(COMPILER_MSVC)
+    return _rotr64(value, shift);
+#else
+    return (value >> shift) | (value << (64 - shift)); // Maps to ROR on GCC/Clang
+#endif
 }

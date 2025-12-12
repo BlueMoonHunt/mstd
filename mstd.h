@@ -8,7 +8,6 @@ extern "C" {
 #include <stdint.h>
 #include <assert.h>
 #include <stdalign.h>
-#include <stdlib.h>
 
 #if defined(_MSC_VER)
 #define COMPILER_MSVC 1
@@ -93,15 +92,11 @@ typedef double f64;
 #define extract16(word, pos)  (((word) >> ((pos) << 4)) & UINT16_MAX)
 #define extract32(word, pos)  (((word) >> ((pos) << 5)) & UINT32_MAX)
 
+#define min(a, b) ((a) < (b)) ? a : b
+#define max(a, b) ((a) > (b)) ? a : b
 #define clamp(low, high, value) min(max(low, value), high)
 
-static inline uint64_t rotate_right_u64(uint64_t value, unsigned int shift) {
-    #if defined(_MSC_VER)
-        return _rotr64(value, shift);
-    #else
-        return (value >> shift) | (value << (64 - shift)); // Maps to ROR on GCC/Clang
-    #endif
-}
+inline uint64_t rotate_right_u64(uint64_t value, unsigned int shift);
 
 #define KB(value) ((value) << 10)
 #define MB(value) ((value) << 20)
@@ -208,14 +203,14 @@ u64 random_in_range(u64 low, u64 high, RandomNumberGenerator* rng);
 
 typedef struct str8 str8;
 struct str8 {
-    u64 size;
     u8* str;
+    u64 size;
 };
 
 typedef struct str16 str16;
 struct str16 {
-    u64 size;
     u16* str;
+    u64 size;
 };
 b32 char_is_space(u8 c);
 b32 char_is_upper(u8 c);
