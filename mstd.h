@@ -1,13 +1,7 @@
 #ifndef MSTD_IMPLEMENTATION
 #define MSTD_IMPLEMENTATION
 
-#ifdef __cplusplus
-extern "C" {
-    #include <cstdalign>
-#else
-    #include <stdalign.h>
-#endif
-
+#include <stdalign.h>
 #include <stdint.h>
 #include <assert.h>
 
@@ -41,6 +35,10 @@ extern "C" {
 #warning "Unknown Architecture"
 #endif
 
+#define internal static
+#define global static
+#define local_persist static
+
 ////////////////////////////////
 // types
 
@@ -67,13 +65,13 @@ typedef double f64;
 #define enum_class(type, size_type) size_type
 
 #if defined(__clang__) || defined(__GNUC__)
-    typedef __uint128_t u128;
+typedef __uint128_t u128;
 #elif defined(COMPILER_MSVC) && defined(_M_X64)
-    typedef struct {
-        u64 low;
-        u64 high;
-    } _u128;
-    #define u128 alignas(16) _u128
+typedef struct {
+    u64 low;
+    u64 high;
+} _u128;
+#define u128 alignas(16) _u128
 #else
 #warning "No supported 128-bit integer implementation found."
 #endif
@@ -81,7 +79,7 @@ typedef double f64;
 ////////////////////////////////
 // math and utils
 
-#define unreferenced_parameter(x) { (x) = (x); }
+#define unreferenced_parameter(x) (void)(x)
 
 #define align_up_pow2(x,b)   (((x) + (b) - 1)&(~((b) - 1)))
 #define align_down_pow2(x,b) ((x)&(~((b) - 1)))
@@ -224,28 +222,20 @@ u8 char_to_upper(u8 c);
 u64 cstr8_length(u8* c);
 u64 cstr16_length(u16* c);
 
-str8 _str8_create(u8* str, u64 size);
-str16 _str16_create(u16* str, u64 size);
-
 str8 str8_of_size(u64 size, Arena* arena);
 str16 str16_of_size(u64 size, Arena* arena);
 
-#define s8_literal(literal) _str8_create((u8*)(literal), sizeof(literal) - 1)
-#define s16_literal(literal) _str16_create((u16*)(literal), sizeof(literal) >> 1 - 1)
-
-str8 str8_from_cstr(const char* str);
+str8 str8_from_cstr(const u8* str);
 str16 str16_from_cstr(const u16* str);
 
-str8 str8_copy(Arena* arena, const str8 str);
-str16 str16_copy(Arena* arena, const str16 str);
+#define str8_literal(literal) str8_from_cstr((u8*)literal)
+#define str16_literal(literal) str16_from_cstr((u16*)literal)
 
-str8 str8_to_lower(Arena* arena, const str8 str);
-str8 str8_to_upper(Arena* arena, const str8 str);
-str8 str8_concat(Arena* arena, const str8 a, const str8 b);
+str8 str8_copy(const str8 str, Arena* arena);
+str16 str16_copy(const str16 str, Arena* arena);
+str8 str8_to_lower(const str8 str, Arena* arena);
+str8 str8_to_upper(const str8 str, Arena* arena);
+str8 str8_concat(const str8 a, const str8 b, Arena* arena);
 b32 str8_equal(const str8 a, const str8 b);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif // MSTD_IMPLEMENTATION

@@ -95,7 +95,7 @@ str16 _str16_create(u16* str, u64 size) {
 
 str8 str8_of_size(u64 size, Arena* arena) {
     assert(arena);
-    str8 str = {.size = size};
+    str8 str = { .size = size };
     str.str = arena_push_array(arena, u8, size + 1);
     str.str[str.size] = 0;
     return str;
@@ -109,7 +109,8 @@ str16 str16_of_size(u64 size, Arena* arena) {
     return str;
 }
 
-str8 str8_from_cstr(const char* str) {
+
+str8 str8_from_cstr(const u8* str) {
     str8 result = { .str = (u8*)str, .size = cstr8_length((u8*)str) };
     return result;
 }
@@ -119,7 +120,7 @@ str16 str16_from_cstr(const u16* str) {
     return result;
 }
 
-str8 str8_copy(Arena* arena, const str8 str) {
+str8 str8_copy(const str8 str, Arena* arena) {
     assert(arena && str.str);
     str8 str_new = str8_of_size(str.size, arena);
     mem_copy(str_new.str, str.str, str.size);
@@ -127,7 +128,7 @@ str8 str8_copy(Arena* arena, const str8 str) {
     return str_new;
 }
 
-str16 str16_copy(Arena* arena, const str16 str) {
+str16 str16_copy(const str16 str, Arena* arena) {
     assert(arena && str.str);
     str16 str_new = str16_of_size(str.size, arena);
     mem_copy(str_new.str, str.str, str.size);
@@ -135,21 +136,21 @@ str16 str16_copy(Arena* arena, const str16 str) {
     return str_new;
 }
 
-str8 str8_to_lower(Arena* arena, const str8 str) {
-    str8 result = str8_copy(arena, str);
+str8 str8_to_lower(const str8 str, Arena* arena) {
+    str8 result = str8_copy(str, arena);
     for (u64 i = 0; i < result.size; i++)
         result.str[i] = char_to_lower(result.str[i]);
     return result;
 }
 
-str8 str8_to_upper(Arena* arena, const str8 str) {
-    str8 result = str8_copy(arena, str);
+str8 str8_to_upper(const str8 str, Arena* arena) {
+    str8 result = str8_copy(str, arena);
     for (u64 i = 0; i < result.size; i++)
         result.str[i] = char_to_upper(result.str[i]);
     return result;
 }
 
-str8 str8_concat(Arena* arena, const str8 a, const str8 b) {
+str8 str8_concat(const str8 a, const str8 b, Arena* arena) {
     str8 result = { .size = a.size + b.size };
     result.str = arena_push_array(arena, u8, result.size + 1);
     mem_copy(result.str, a.str, b.size);
@@ -166,7 +167,7 @@ Arena* arena_alloc(const ArenaCreateInfo create_info) {
     u64 reserve_size = create_info.reserve_size;
     u64 commit_size = create_info.commit_size;
 
-    if(create_info.allocate_large_pages) {
+    if (create_info.allocate_large_pages) {
         reserve_size = align_up_pow2(reserve_size, os_get_large_page_size());
         commit_size = align_up_pow2(commit_size, os_get_large_page_size());
     }
@@ -176,7 +177,7 @@ Arena* arena_alloc(const ArenaCreateInfo create_info) {
     }
 
     void* base;
-    if(create_info.allocate_large_pages) {
+    if (create_info.allocate_large_pages) {
         base = os_reserve_large(reserve_size);
         os_commit_large(base, commit_size);
     }
@@ -218,10 +219,10 @@ void* arena_push(Arena* arena, const u64 size, const u64 alignment) {
 
         if (!commit_success)
             arena->commited += commit_size;
-        }
+    }
 
     void* result = 0;
-    if(arena->commited >= end_pos){
+    if (arena->commited >= end_pos) {
         result = (void*)(arena->base + begin_pos);
         arena->cursor = end_pos;
     }
@@ -269,8 +270,10 @@ u64 random_pcg(RandomNumberGenerator* rng) {
     return rotate_right_u64(xorshifted, rot);
 }
 
+
+
 #if defined(OS_WINDOWS)
-    #include "ext/mstd_win32.c"
+#include "ext/mstd_win32.c"
 #elif defined(OS_LINUX)
 #elif defined(OS_MAC)
 #endif
