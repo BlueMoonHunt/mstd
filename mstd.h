@@ -305,11 +305,11 @@ void* arena_push(Arena* arena, const u64 size, const u64 alignment) {
         b8 commit_success = 0;
 
         if (arena->has_large_pages)
-            commit_size = os_commit_large(commit_ptr, commit_size);
+            commit_success = os_commit_large(commit_ptr, commit_size);
         else
-            commit_size = os_commit(commit_ptr, commit_size);
+            commit_success = os_commit(commit_ptr, commit_size);
 
-        if (!commit_success)
+        if (commit_success)
             arena->commited += commit_size;
     }
 
