@@ -30,20 +30,20 @@ function void mem_release(void* ptr, u64 size) {
     VirtualFree(ptr, 0, MEM_RELEASE);
 }
 
-function u64 mem_page_size() {
+function u64 mem_page_size(void) {
     SYSTEM_INFO sysinfo = { 0 };
     GetSystemInfo(&sysinfo);
     return sysinfo.dwPageSize;
 }
 
-function u64 mem_large_page_size() {
+function u64 mem_large_page_size(void) {
     return GetLargePageMinimum();
 }
 
 ////////////////////////////////
 // CLI
 
-function void cli_attach_if_exists() {
+function void cli_attach_if_exists(void) {
     if (AttachConsole(ATTACH_PARENT_PROCESS)) {
         HANDLE hOut = CreateFileA("CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
         HANDLE hIn  = CreateFileA("CONIN$",  GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,  NULL, OPEN_EXISTING, 0, NULL);
@@ -185,7 +185,7 @@ function void thread_detach(Thread thread) {
     }
 }
 
-function u32 thread_id() {
+function u32 thread_id(void) {
     return (u32)GetCurrentThreadId();
 }
 
@@ -193,7 +193,7 @@ function void thread_sleep(u32 ms) {
     Sleep((DWORD)ms);
 }
 
-function Mutex mutex_create() {
+function Mutex mutex_create(void) {
     ThreadEntity* entity = thread_entity_alloc(Thread_Entity_TYPE_MUTEX);
     if (entity)
         InitializeCriticalSection(&entity->mutex);
@@ -218,7 +218,7 @@ function void mutex_destroy(Mutex mutex) {
     thread_entity_release(entity);
 }
 
-function RWMutex rw_mutex_create() {
+function RWMutex rw_mutex_create(void) {
     ThreadEntity* entity = thread_entity_alloc(Thread_Entity_TYPE_RWMUTEX);
     if (entity)
         InitializeSRWLock(&entity->rw_mutex);
@@ -250,7 +250,7 @@ function void rw_mutex_destroy(RWMutex mutex) {
     thread_entity_release(entity);
 }
 
-function CondVar cond_var_create() {
+function CondVar cond_var_create(void) {
     ThreadEntity* entity = thread_entity_alloc(Thread_Entity_TYPE_CONDITION_VARIABLE);
     if (entity)
         InitializeConditionVariable(&entity->cv);
@@ -645,14 +645,14 @@ function void file_watcher_destroy(FileWatcher* watcher) {
 ////////////////////////////////
 // Module: Clock
 
-function u64 clock_resolution_us() {
+function u64 clock_resolution_us(void) {
     LARGE_INTEGER resolution;
     if (QueryPerformanceFrequency(&resolution))
         return (resolution.QuadPart);
     return 1;
 }
 
-function u64 clock_ticks_now() {
+function u64 clock_ticks_now(void) {
     LARGE_INTEGER counter;
     QueryPerformanceCounter(&counter);
     return (u64)(counter.QuadPart);

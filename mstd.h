@@ -76,7 +76,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
 #if COMPILER_MSVC
 #include <intrin.h>
 #endif
@@ -98,14 +97,6 @@
 #define no_inline __attribute__((noinline))
 #else
 #error no_inline not defined for this compiler.
-#endif
-
-#if COMPILER_MSVC
-#define thread_var __declspec(thread)
-#elif COMPILER_CLANG || COMPILER_GCC
-#define thread_var __thread
-#else
-#error thread_var not defined for this compiler
 #endif
 
 #define global static
@@ -177,43 +168,15 @@ typedef unsigned int uptr;
 
 #if COMPILER_MSVC
 
-static function force_inline u8 u32_count_zerol(u32 x) {
-    unsigned long zeros = 0;
-    return _BitScanReverse(&zeros, x) ? (u8)(31 - zeros) : 32;
-}
-static function force_inline u8 u64_count_zerol(u64 x) {
-    unsigned long zeros = 0;
-    return _BitScanReverse64(&zeros, x) ? (u8)(63 - zeros) : 64;
-}
+function force_inline u8 u32_count_zerol(u32 x);
+function force_inline u8 u64_count_zerol(u64 x);
+function force_inline u8 u32_count_zeror(u32 x);
+function force_inline u8 u64_count_zeror(u64 x);
 
-static function force_inline u8 u32_count_zeror(u32 x) {
-    unsigned long zeros = 0;
-    _BitScanForward(&zeros, x);
-    return (u8)zeros;
-}
-static function force_inline u8 u64_count_zeror(u64 x) {
-    unsigned long zeros = 0;
-    _BitScanForward64(&zeros, x);
-    return (u8)zeros;
-}
-
-static function force_inline i8 u32_msb(u32 x) {
-    unsigned long where;
-    return _BitScanReverse(&where, x) ? (i8)where : -1;
-}
-static function force_inline i8 u64_msb(u64 x) {
-    unsigned long where;
-    return _BitScanReverse64(&where, x) ? (i8)where : -1;
-}
-
-static function force_inline i8 u32_lsb(u32 x) {
-    unsigned long where;
-    return _BitScanForward(&where, x) ? (i8)where : -1;
-}
-static function force_inline i8 u64_lsb(u64 x) {
-    unsigned long where;
-    return _BitScanForward64(&where, x) ? (i8)where : -1;
-}
+function force_inline i8 u32_msb(u32 x);
+function force_inline i8 u64_msb(u64 x);
+function force_inline i8 u32_lsb(u32 x);
+function force_inline i8 u64_lsb(u64 x);
 
 #define u32_count_set_bits __popcnt
 #define u64_count_set_bits __popcnt64
@@ -266,7 +229,7 @@ int memcmp(const void *buffer1, const void *buffer2, size_t count);
 #define mem_zero_array(mem, count) mem_zero((mem), sizeof(*(mem)) * (count))
 #define mem_copy_struct(dest, src) mem_copy((dest), (src), sizeof(*(dest)))
 #define mem_copy_array(dest, src, count)                                       \
-  mem_copy((dest), (src), sizeof(*(dest)) * (count))
+    mem_copy((dest), (src), sizeof(*(dest)) * (count))
 #define mem_move_struct(dest, src) mem_move((dest), (src), sizeof(*(dest)))
 #define mem_move_array(dest, src, count)                                       \
     mem_move((dest), (src), sizeof(*(dest)) * (count))
@@ -322,7 +285,7 @@ int memcmp(const void *buffer1, const void *buffer2, size_t count);
         if (!(condition)) {                                                    \
             printf("ASSERT FAILED\nFILE: %s\nLINE: %d\nCONDITION: %s\n",       \
                    __FILE__, __LINE__, #condition);                            \
-            trap();                                                            \
+            trap(void);                                                            \
         }                                                                      \
     } while (0)
 
@@ -332,14 +295,14 @@ int memcmp(const void *buffer1, const void *buffer2, size_t count);
             printf("CODE MISMATCH\nFILE: %s\nLINE: %d\nEXPECTED: %s\nACTUAL: " \
                    "%s\n",                                                     \
                    __FILE__, __LINE__, #check, #code);                         \
-            trap();                                                            \
+            trap(void);                                                            \
         }                                                                      \
     } while (0)
 
 #define debug_panic()                                                          \
     do {                                                                       \
         printf("PANIC\nFILE: %s\nLINE: %d\n", __FILE__, __LINE__);             \
-        trap();                                                                \
+        trap(void);                                                                \
     } while (0)
 #else
 #define debug_assert(condition)
@@ -352,8 +315,8 @@ function u8 mem_commit(void *ptr, u64 size, u32 large_pages);
 function void mem_decommit(void *ptr, u64 size);
 function void mem_release(void *ptr, u64 size);
 
-function u64 mem_page_size();
-function u64 mem_large_page_size();
+function u64 mem_page_size(void);
+function u64 mem_large_page_size(void);
 
 ////////////////////////////////
 // Module: Arena
@@ -400,7 +363,7 @@ function void arena_temp_pop_all(Arena *arena);
 #define arena_temp_scope(arena)                                                \
     scope(arena_temp_push(arena), arena_temp_pop(arena))
 
-function Arena *arena_scratch_alloc();
+function Arena *arena_scratch_alloc(void);
 function void arena_scratch_release(Arena *arena);
 #define arena_scratch_scope(scratch)                                           \
     for (Arena *scratch = arena_scratch_alloc(); scratch != NULL;              \
@@ -690,6 +653,14 @@ function Str8View str8_slice_opt(Str8View str, u64 pos, Str8ViewOpt opt);
 ////////////////////////////////
 // Module Thread
 
+#if COMPILER_MSVC
+#define thread_var __declspec(thread)
+#elif COMPILER_CLANG || COMPILER_GCC
+#define thread_var __thread
+#else
+#error thread_var not defined for this compiler
+#endif
+
 typedef Handle Thread;
 typedef Handle Mutex;
 typedef Handle RWMutex;
@@ -717,13 +688,13 @@ function Thread thread_attach(ThreadEntryPointFunctionType func,
                               void *user_data);
 function u32 thread_join(Thread thread);
 function void thread_detach(Thread thread);
-function u32 thread_id();
+function u32 thread_id(void);
 function void thread_sleep(u32 ms);
 
 ////////////////////////////////
 // Mutex
 
-function Mutex mutex_create();
+function Mutex mutex_create(void);
 function void mutex_take(Mutex mutex);
 function void mutex_drop(Mutex mutex);
 function void mutex_destroy(Mutex mutex);
@@ -732,7 +703,7 @@ function void mutex_destroy(Mutex mutex);
 ////////////////////////////////
 // Read write mutex
 
-function RWMutex rw_mutex_create();
+function RWMutex rw_mutex_create(void);
 function void rw_mutex_take(RWMutex mutex, u32 write_mode);
 function void rw_mutex_drop(RWMutex mutex, u32 write_mode);
 function void rw_mutex_destroy(RWMutex mutex);
@@ -748,7 +719,7 @@ function void rw_mutex_destroy(RWMutex mutex);
 ////////////////////////////////
 // Condition Variables
 
-function CondVar cond_var_create();
+function CondVar cond_var_create(void);
 function u32 cond_var_wait(CondVar var, Mutex mutex);
 function u32 cond_var_wait_rw(CondVar var, RWMutex mutex, u32 write_mode);
 function void cond_var_signal(CondVar var);
@@ -785,13 +756,13 @@ function Stripe *stripe_array_get_stripe(StripeArray *array, u64 idx);
 ////////////////////////////////
 // Module: CLI
 
-function void cli_attach_if_exists();
+function void cli_attach_if_exists(void);
 
 ////////////////////////////////
 // Module: Clock
 
-function u64 clock_resolution_us();
-function u64 clock_ticks_now();
+function u64 clock_resolution_us(void);
+function u64 clock_ticks_now(void);
 
 ////////////////////////////////
 // Module Timer
@@ -802,7 +773,7 @@ typedef struct Timer {
     f64 inverse_ticks_per_us;
 } Timer;
 
-function Timer timer_start();
+function Timer timer_start(void);
 function void timer_update(Timer *timer);
 function u64 timer_get_timestamp(Timer *timer);
 
@@ -882,7 +853,6 @@ typedef Handle LibHandle;
 function LibHandle lib_load(Str8 name);
 function void lib_unload(LibHandle handle);
 function void *lib_get_symbol(LibHandle lib, char *name);
-
 ////////////////////////////////
 // MX
 

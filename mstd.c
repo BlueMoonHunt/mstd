@@ -5,6 +5,51 @@
 #endif
 
 ////////////////////////////////
+// Base Types
+
+#if COMPILER_MSVC
+
+function force_inline u8 u32_count_zerol(u32 x) {
+    unsigned long zeros = 0;
+    return _BitScanReverse(&zeros, x) ? (u8)(31 - zeros) : 32;
+}
+function force_inline u8 u64_count_zerol(u64 x) {
+    unsigned long zeros = 0;
+    return _BitScanReverse64(&zeros, x) ? (u8)(63 - zeros) : 64;
+}
+
+function force_inline u8 u32_count_zeror(u32 x) {
+    unsigned long zeros = 0;
+    _BitScanForward(&zeros, x);
+    return (u8)zeros;
+}
+function force_inline u8 u64_count_zeror(u64 x) {
+    unsigned long zeros = 0;
+    _BitScanForward64(&zeros, x);
+    return (u8)zeros;
+}
+
+function force_inline i8 u32_msb(u32 x) {
+    unsigned long where;
+    return _BitScanReverse(&where, x) ? (i8)where : -1;
+}
+function force_inline i8 u64_msb(u64 x) {
+    unsigned long where;
+    return _BitScanReverse64(&where, x) ? (i8)where : -1;
+}
+
+function force_inline i8 u32_lsb(u32 x) {
+    unsigned long where;
+    return _BitScanForward(&where, x) ? (i8)where : -1;
+}
+function force_inline i8 u64_lsb(u64 x) {
+    unsigned long where;
+    return _BitScanForward64(&where, x) ? (i8)where : -1;
+}
+
+#endif
+
+////////////////////////////////
 // Arena
 
 function Arena* arena_alloc_opt(u64 reserve_size, char* file, u32 line, ArenaOpt opt) {
@@ -111,7 +156,7 @@ function void arena_temp_pop_all(Arena* arena) {
 global thread_var Arena* arena_scratch_pool[ARENA_SCRATCH_POOL_COUNT] = { 0 };
 global thread_var u8     arena_scratch_pool_available_mask = (1u << ARENA_SCRATCH_POOL_COUNT) - 1;
 
-function Arena* arena_scratch_alloc() {
+function Arena* arena_scratch_alloc(void) {
     i32 index = u32_lsb((u32)arena_scratch_pool_available_mask);
 
     if (index >= 0 && index < ARENA_SCRATCH_POOL_COUNT) {
@@ -618,7 +663,7 @@ function Stripe* stripe_array_get_stripe(StripeArray* array, u64 idx) {
 ////////////////////////////////
 // Module: Timer
 
-function Timer timer_start() {
+function Timer timer_start(void) {
     Timer timer = { 0 };
     timer.ticks = clock_ticks_now();
     timer.delta = 16666.6f;
