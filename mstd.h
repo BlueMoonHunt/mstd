@@ -853,11 +853,5 @@ typedef Handle LibHandle;
 function LibHandle lib_load(Str8 name);
 function void lib_unload(LibHandle handle);
 function void *lib_get_symbol(LibHandle lib, char *name);
-////////////////////////////////
-// MX
-
-#ifdef MSTD_USE_MATH
-#include "mx/mstd_math.h"
-#endif
 
 #endif // MSTD_H
