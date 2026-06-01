@@ -72,6 +72,7 @@
 #define LANG_C 1
 #endif
 
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -102,6 +103,12 @@
 #define global static
 #define function
 #define internal static
+
+#if MSTD_DLL
+#define export __declspec(dllexport) __stdcall
+#else
+#define export
+#endif
 
 ////////////////////////////////
 // Utils
@@ -148,35 +155,74 @@ typedef int iptr;
 typedef unsigned int uptr;
 #endif
 
-#define i8_min ((i8)0x80)
-#define i8_max ((i8)0x7F)
-#define u8_max ((u8)0xFF)
+////////////////////////////////
+// Limits
 
-#define i16_min ((i16)0x8000)
-#define i16_max ((i16)0x7FFF)
-#define u16_max ((u16)0xFFFF)
+#define u8_min 0
+#define u16_min 0
+#define u32_min 0
+#define u64_min 0
 
-#define i32_min ((i32)0x80000000)
-#define i32_max ((i32)0x7FFFFFFF)
-#define u32_max ((u32)0xFFFFFFFFU)
+#if defined(COMPILER_GCC) || defined(COMPILER_CLANG)
+#define i8_min ((-__INT8_MAX__) - 1)
+#define i8_max __INT8_MAX__
+#define u8_max (__INT8_MAX__ * 2U + 1U)
 
-#define i64_min ((i64)0x8000000000000000LL)
-#define i64_max ((i64)0x7FFFFFFFFFFFFFFFLL)
-#define u64_max ((u64)0xFFFFFFFFFFFFFFFFULL)
+#define i16_min ((-__INT16_MAX__) - 1)
+#define i16_max __INT16_MAX__
+#define u16_max (__INT16_MAX__ * 2U + 1U)
+
+#define i32_min ((-__INT32_MAX__) - 1)
+#define i32_max __INT32_MAX__
+#define u32_max (__INT32_MAX__ * 2U + 1U)
+
+#define i64_min ((-__INT64_MAX__) - 1LL)
+#define i64_max __INT64_MAX__
+#define u64_max (__INT64_MAX__ * 2ULL + 1ULL)
+
+#define f32_min __FLT_MIN__
+#define f32_max __FLT_MAX__
+#define f64_min __DBL_MIN__
+#define f64_max __DBL_MAX__
+
+#else
+#define i8_min ((i8)(-127 - 1))
+#define i8_max ((i8)127)
+#define u8_max ((u8)255U)
+
+#define i16_min ((i16)(-32767 - 1))
+#define i16_max ((i16)32767)
+#define u16_max ((u16)65535U)
+
+#define i32_min (-2147483647 - 1)
+#define i32_max 2147483647
+#define u32_max 4294967295U
+
+#define i64_min (-9223372036854775807LL - 1LL)
+#define i64_max 9223372036854775807LL
+#define u64_max 18446744073709551615ULL
+
+#define f32_max (*(const float *)(const unsigned int[]){0x7F7FFFFF})
+#define f32_min (*(const float *)(const unsigned int[]){0x00800000})
+#define f64_max                                                                \
+    (*(const double *)(const unsigned long long[]){0x7FEFFFFFFFFFFFFFULL})
+#define f64_min                                                                \
+    (*(const double *)(const unsigned long long[]){0x0010000000000000ULL})
+#endif
 
 #define enum_t(enum, T) T
 
 #if COMPILER_MSVC
 
-function force_inline u8 u32_count_zerol(u32 x);
-function force_inline u8 u64_count_zerol(u64 x);
-function force_inline u8 u32_count_zeror(u32 x);
-function force_inline u8 u64_count_zeror(u64 x);
+export function force_inline u8 u32_count_zerol(u32 x);
+export function force_inline u8 u64_count_zerol(u64 x);
+export function force_inline u8 u32_count_zeror(u32 x);
+export function force_inline u8 u64_count_zeror(u64 x);
 
-function force_inline i8 u32_msb(u32 x);
-function force_inline i8 u64_msb(u64 x);
-function force_inline i8 u32_lsb(u32 x);
-function force_inline i8 u64_lsb(u64 x);
+export function force_inline i8 u32_msb(u32 x);
+export function force_inline i8 u64_msb(u64 x);
+export function force_inline i8 u32_lsb(u32 x);
+export function force_inline i8 u64_lsb(u64 x);
 
 #define u32_count_set_bits __popcnt
 #define u64_count_set_bits __popcnt64
@@ -270,6 +316,38 @@ int memcmp(const void *buffer1, const void *buffer2, size_t count);
 #define clamp_bottom(val, low) (((val) > (low)) ? (val) : (low))
 #define clamp(val, low, high) (clamp_bottom(low, clamp_top(val, high)))
 
+#define DECLARE_QUANT(TYPE)                                                    \
+    export force_inline function TYPE quantize_f32_to_##TYPE(f32 val, f32 min, \
+                                                             f32 max);         \
+    export force_inline function f32 dequantize_##TYPE##_to_f32(               \
+        TYPE val, f32 min, f32 max);
+
+#define DEFINE_QUANT(TYPE)                                                     \
+    force_inline function TYPE quantize_f32_to_##TYPE(f32 val, f32 min,        \
+                                                      f32 max) {               \
+        if (max <= min)                                                        \
+            return (TYPE)0;                                                    \
+        f32 scaled = ((val - min) / (max - min)) *                             \
+                         ((f32)TYPE##_max - (f32)TYPE##_min) +                 \
+                     (f32)TYPE##_min;                                          \
+        return (TYPE)clamp(roundf(scaled), (f32)TYPE##_min, (f32)TYPE##_max);  \
+    }                                                                          \
+    force_inline function f32 dequantize_##TYPE##_to_f32(TYPE val, f32 min,    \
+                                                         f32 max) {            \
+        if (max <= min)                                                        \
+            return min;                                                        \
+        return ((f32)val - (f32)TYPE##_min) /                                  \
+                   ((f32)TYPE##_max - (f32)TYPE##_min) * (max - min) +         \
+               min;                                                            \
+    }
+
+DECLARE_QUANT(i8)
+DECLARE_QUANT(i16)
+DECLARE_QUANT(i32)
+DECLARE_QUANT(u8)
+DECLARE_QUANT(u16)
+DECLARE_QUANT(u32)
+
 ////////////////////////////////
 // Module: Debug
 
@@ -285,7 +363,7 @@ int memcmp(const void *buffer1, const void *buffer2, size_t count);
         if (!(condition)) {                                                    \
             printf("ASSERT FAILED\nFILE: %s\nLINE: %d\nCONDITION: %s\n",       \
                    __FILE__, __LINE__, #condition);                            \
-            trap(void);                                                            \
+            trap(void);                                                        \
         }                                                                      \
     } while (0)
 
@@ -295,14 +373,14 @@ int memcmp(const void *buffer1, const void *buffer2, size_t count);
             printf("CODE MISMATCH\nFILE: %s\nLINE: %d\nEXPECTED: %s\nACTUAL: " \
                    "%s\n",                                                     \
                    __FILE__, __LINE__, #check, #code);                         \
-            trap(void);                                                            \
+            trap(void);                                                        \
         }                                                                      \
     } while (0)
 
 #define debug_panic()                                                          \
     do {                                                                       \
         printf("PANIC\nFILE: %s\nLINE: %d\n", __FILE__, __LINE__);             \
-        trap(void);                                                                \
+        trap(void);                                                            \
     } while (0)
 #else
 #define debug_assert(condition)
@@ -310,13 +388,13 @@ int memcmp(const void *buffer1, const void *buffer2, size_t count);
 #define debug_panic
 #endif
 
-function void *mem_reserve(u64 size, u32 large_pages);
-function u8 mem_commit(void *ptr, u64 size, u32 large_pages);
-function void mem_decommit(void *ptr, u64 size);
-function void mem_release(void *ptr, u64 size);
+export function void *mem_reserve(u64 size, u32 large_pages);
+export function u8 mem_commit(void *ptr, u64 size, u32 large_pages);
+export function void mem_decommit(void *ptr, u64 size);
+export function void mem_release(void *ptr, u64 size);
 
-function u64 mem_page_size(void);
-function u64 mem_large_page_size(void);
+export function u64 mem_page_size(void);
+export function u64 mem_large_page_size(void);
 
 ////////////////////////////////
 // Module: Arena
@@ -343,28 +421,28 @@ typedef struct Arena {
 #define ARENA_HEADER_SIZE align_up_pow2(sizeof(Arena), 64)
 
 OPTIONS(ArenaOpt, u8 large_pages;);
-function Arena *arena_alloc_opt(u64 reserve_size, char *file, u32 line,
-                                ArenaOpt opt);
+export function Arena *arena_alloc_opt(u64 reserve_size, char *file, u32 line,
+                                       ArenaOpt opt);
 #define arena_alloc(reserve_size, ...)                                         \
     arena_alloc_opt(reserve_size, __FILE__, __LINE__, (ArenaOpt){__VA_ARGS__})
 
-function void arena_release(Arena *arena);
-function void arena_reset(Arena *arena);
+export function void arena_release(Arena *arena);
+export function void arena_reset(Arena *arena);
 
-function void *arena_push(Arena *arena, u64 size, u64 align);
+export function void *arena_push(Arena *arena, u64 size, u64 align);
 #define arena_push_struct(arena, T)                                            \
     (T *)arena_push(arena, sizeof(T), mem_align_of(T))
 #define arena_push_array(arena, T, count)                                      \
     (T *)arena_push(arena, sizeof(T) * (count), mem_align_of(T))
 
-function void arena_temp_push(Arena *arena);
-function void arena_temp_pop(Arena *arena);
-function void arena_temp_pop_all(Arena *arena);
+export function void arena_temp_push(Arena *arena);
+export function void arena_temp_pop(Arena *arena);
+export function void arena_temp_pop_all(Arena *arena);
 #define arena_temp_scope(arena)                                                \
     scope(arena_temp_push(arena), arena_temp_pop(arena))
 
-function Arena *arena_scratch_alloc(void);
-function void arena_scratch_release(Arena *arena);
+export function Arena *arena_scratch_alloc(void);
+export function void arena_scratch_release(Arena *arena);
 #define arena_scratch_scope(scratch)                                           \
     for (Arena *scratch = arena_scratch_alloc(); scratch != NULL;              \
          (arena_scratch_release(scratch), scratch = NULL))
@@ -442,8 +520,10 @@ struct DArrayMetaData {
     u64 el_size;
 };
 
-function force_inline void *darray_handle(Arena *arena, DArrayHeader *header,
-                                          DArrayMetaData meta, u64 index);
+export function force_inline void *darray_handle(Arena *arena,
+                                                 DArrayHeader *header,
+                                                 DArrayMetaData meta,
+                                                 u64 index);
 
 ////////////////////////////////
 // Module:  String
@@ -590,12 +670,12 @@ mem_align_to(64) global const u8 ASCII_LUT[256] = {
 ////////////////////////////////
 // Unicode
 
-function UnicodeDecode utf8_decode(u8 *str, u64 max);
-function UnicodeDecode utf16_decode(u16 *str, u64 max);
-function u32 utf8_encode(u8 *str, u32 codepoint);
-function u32 utf16_encode(u16 *str, u32 codepoint);
-function u32 utf8_size(u32 cp);
-function u32 utf16_size(u32 cp);
+export function UnicodeDecode utf8_decode(u8 *str, u64 max);
+export function UnicodeDecode utf16_decode(u16 *str, u64 max);
+export function u32 utf8_encode(u8 *str, u32 codepoint);
+export function u32 utf16_encode(u16 *str, u32 codepoint);
+export function u32 utf8_size(u32 cp);
+export function u32 utf16_size(u32 cp);
 
 ////////////////////////////////
 // String Constructor
@@ -603,50 +683,50 @@ function u32 utf16_size(u32 cp);
 #define str8_lit(S)                                                            \
     (Str8) { .size = sizeof(S) - 1, .data = (u8 *)S }
 #define str8(str) str8_from_cstr((u8 *)str)
-function Str8 str8_from_cstr(u8 *str);
-function Str8 str8_from_fmt(Arena *arena, char *fmt, ...);
-function Str8 str8_from_16(Arena *arena, Str16 str);
-function Str8 str8_from_32(Arena *arena, Str32 str);
-function Str8 str8_from_mem_size(Arena *arena, u64 size);
+export function Str8 str8_from_cstr(u8 *str);
+export function Str8 str8_from_fmt(Arena *arena, char *fmt, ...);
+export function Str8 str8_from_16(Arena *arena, Str16 str);
+export function Str8 str8_from_32(Arena *arena, Str32 str);
+export function Str8 str8_from_mem_size(Arena *arena, u64 size);
 
-function Str16 str16_from_cstr(u16 *str);
+export function Str16 str16_from_cstr(u16 *str);
 #define str16 str16_from_cstr
-function Str16 str16_from_8(Arena *arena, Str8 str);
-function Str16 str16_from_mem_size(Arena *arena, u64 size);
+export function Str16 str16_from_8(Arena *arena, Str8 str);
+export function Str16 str16_from_mem_size(Arena *arena, u64 size);
 
-function Str32 str32_from_8(Arena *arena, Str8 str);
+export function Str32 str32_from_8(Arena *arena, Str8 str);
 
 ////////////////////////////////
 // String Matching
 
 OPTIONS(Str8MatchOpt, u8 case_insensitive; u8 slash_insensitive;);
 
-function u32 str8_match_opt(Str8 a, Str8 b, Str8MatchOpt opt);
+export function u32 str8_match_opt(Str8 a, Str8 b, Str8MatchOpt opt);
 #define str8_match(a, b, ...) str8_match_opt(a, b, (Str8MatchOpt){__VA_ARGS__})
 #define str8_match(a, b, ...) str8_match_opt(a, b, (Str8MatchOpt){__VA_ARGS__})
-function u64 str8_find_opt(Str8 string, Str8 substring, u64 offset,
-                           Str8MatchOpt opt);
+export function u64 str8_find_opt(Str8 string, Str8 substring, u64 offset,
+                                  Str8MatchOpt opt);
 #define str8_find(string, substring, offset, ...)                              \
     str8_find_opt(string, substring, offset, (Str8MatchOpt){__VA_ARGS__})
-function u64 str8_find_reverse_opt(Str8 string, Str8 substring, u64 offset,
-                                   Str8MatchOpt opt);
+export function u64 str8_find_reverse_opt(Str8 string, Str8 substring,
+                                          u64 offset, Str8MatchOpt opt);
 #define str8_find_reverse(string, substring, offset, ...)                      \
     str8_find(string, substring, offset, (Str8MatchOpt){__VA_ARGS__})
 
 ////////////////////////////////
 // String concatinate and copy
 
-function Str8 str8_concat(Arena *arena, Str8 a, Str8 b);
-function Str8 str8_concat_args_till_str_npos(Arena *arena, ...);
+export function Str8 str8_concat(Arena *arena, Str8 a, Str8 b);
+export function Str8 str8_concat_args_till_str_npos(Arena *arena, ...);
 #define str8_concat_n(arena, ...)                                              \
     str8_concat_args_till_str_npos(arena, __VA_ARGS__, (Str8){.size = NPOS})
 
-function Str8 str8_copy(Arena *arena, Str8 str);
+export function Str8 str8_copy(Arena *arena, Str8 str);
 
 ////////////////////////////////
 // String slicing
 OPTIONS(Str8ViewOpt, Str8 delimiter; u8 postfix;);
-function Str8View str8_slice_opt(Str8View str, u64 pos, Str8ViewOpt opt);
+export function Str8View str8_slice_opt(Str8View str, u64 pos, Str8ViewOpt opt);
 #define str8_slice(str, pos, ...)                                              \
     str8_slice_opt(str, pos, (Str8ViewOpt){__VA_ARGS__})
 
@@ -684,29 +764,29 @@ typedef struct StripeArray {
 ////////////////////////////////
 // Threads
 
-function Thread thread_attach(ThreadEntryPointFunctionType func,
-                              void *user_data);
-function u32 thread_join(Thread thread);
-function void thread_detach(Thread thread);
-function u32 thread_id(void);
-function void thread_sleep(u32 ms);
+export function Thread thread_attach(ThreadEntryPointFunctionType func,
+                                     void *user_data);
+export function u32 thread_join(Thread thread);
+export function void thread_detach(Thread thread);
+export function u32 thread_id(void);
+export function void thread_sleep(u32 ms);
 
 ////////////////////////////////
 // Mutex
 
-function Mutex mutex_create(void);
-function void mutex_take(Mutex mutex);
-function void mutex_drop(Mutex mutex);
-function void mutex_destroy(Mutex mutex);
+export function Mutex mutex_create(void);
+export function void mutex_take(Mutex mutex);
+export function void mutex_drop(Mutex mutex);
+export function void mutex_destroy(Mutex mutex);
 #define mutex_scope(mutex) scope(mutex_take(mutex), mutex_drop(mutex));
 
 ////////////////////////////////
 // Read write mutex
 
-function RWMutex rw_mutex_create(void);
-function void rw_mutex_take(RWMutex mutex, u32 write_mode);
-function void rw_mutex_drop(RWMutex mutex, u32 write_mode);
-function void rw_mutex_destroy(RWMutex mutex);
+export function RWMutex rw_mutex_create(void);
+export function void rw_mutex_take(RWMutex mutex, u32 write_mode);
+export function void rw_mutex_drop(RWMutex mutex, u32 write_mode);
+export function void rw_mutex_destroy(RWMutex mutex);
 #define rw_mutex_take_r(mutex) rw_mutex_take((mutex), (0))
 #define rw_mutex_take_w(mutex) rw_mutex_take((mutex), (1))
 #define rw_mutex_drop_r(mutex) rw_mutex_drop((mutex), (0))
@@ -719,50 +799,51 @@ function void rw_mutex_destroy(RWMutex mutex);
 ////////////////////////////////
 // Condition Variables
 
-function CondVar cond_var_create(void);
-function u32 cond_var_wait(CondVar var, Mutex mutex);
-function u32 cond_var_wait_rw(CondVar var, RWMutex mutex, u32 write_mode);
-function void cond_var_signal(CondVar var);
-function void cond_var_broadcast(CondVar var);
-function void cond_var_destroy(CondVar var);
+export function CondVar cond_var_create(void);
+export function u32 cond_var_wait(CondVar var, Mutex mutex);
+export function u32 cond_var_wait_rw(CondVar var, RWMutex mutex,
+                                     u32 write_mode);
+export function void cond_var_signal(CondVar var);
+export function void cond_var_broadcast(CondVar var);
+export function void cond_var_destroy(CondVar var);
 #define cond_var_wait_r(var, mutex) cond_var_wait_rw((var), (mutex), (0))
 #define cond_var_wait_w(var, mutex) cond_var_wait_rw((var), (mutex), (1))
 
 ////////////////////////////////
 // Semaphore
 
-function Semaphore semaphore_create(u32 initial_count, u32 max_count,
-                                    Str8 name);
-function Semaphore semaphore_open(Str8 name);
-function void semaphore_close(Semaphore semaphore);
-function u32 semaphore_take(Semaphore semaphore);
-function void semaphore_drop(Semaphore semaphore);
-function void semaphore_destroy(Semaphore semaphore);
+export function Semaphore semaphore_create(u32 initial_count, u32 max_count,
+                                           Str8 name);
+export function Semaphore semaphore_open(Str8 name);
+export function void semaphore_close(Semaphore semaphore);
+export function u32 semaphore_take(Semaphore semaphore);
+export function void semaphore_drop(Semaphore semaphore);
+export function void semaphore_destroy(Semaphore semaphore);
 
 ////////////////////////////////
 // Barriers
 
-function Barrier barrier_create(u64 count);
-function void barrier_wait(Barrier barrier);
-function void barrier_destroy(Barrier barrier);
+export function Barrier barrier_create(u64 count);
+export function void barrier_wait(Barrier barrier);
+export function void barrier_destroy(Barrier barrier);
 
 ////////////////////////////////
 // Stripe Array
 
-function StripeArray stripe_array_alloc(Arena *arena);
-function void stripe_array_release(StripeArray *array);
-function Stripe *stripe_array_get_stripe(StripeArray *array, u64 idx);
+export function StripeArray stripe_array_alloc(Arena *arena);
+export function void stripe_array_release(StripeArray *array);
+export function Stripe *stripe_array_get_stripe(StripeArray *array, u64 idx);
 
 ////////////////////////////////
 // Module: CLI
 
-function void cli_attach_if_exists(void);
+export function void cli_attach_if_exists(void);
 
 ////////////////////////////////
 // Module: Clock
 
-function u64 clock_resolution_us(void);
-function u64 clock_ticks_now(void);
+export function u64 clock_resolution_us(void);
+export function u64 clock_ticks_now(void);
 
 ////////////////////////////////
 // Module Timer
@@ -773,9 +854,9 @@ typedef struct Timer {
     f64 inverse_ticks_per_us;
 } Timer;
 
-function Timer timer_start(void);
-function void timer_update(Timer *timer);
-function u64 timer_get_timestamp(Timer *timer);
+export function Timer timer_start(void);
+export function void timer_update(Timer *timer);
+export function u64 timer_get_timestamp(Timer *timer);
 
 ////////////////////////////////
 // Module: File
@@ -814,24 +895,24 @@ typedef struct Win32FileWatcher FileWatcher;
 typedef struct LinuxFileWatcher FileWatcher;
 #endif
 
-function u32 file_delete(Str8 path);
-function u32 file_copy(Str8 src, Str8 dest);
-function u32 file_move(Str8 src, Str8 dest);
-function u32 file_exists(Str8 path);
-function u32 file_directory_exists(Str8 path);
+export function u32 file_delete(Str8 path);
+export function u32 file_copy(Str8 src, Str8 dest);
+export function u32 file_move(Str8 src, Str8 dest);
+export function u32 file_exists(Str8 path);
+export function u32 file_directory_exists(Str8 path);
 
-function FileHandle file_open(Str8 name, FileAccessFlag flags);
-function u64 file_size(FileHandle handle);
-function void file_close(FileHandle handle);
+export function FileHandle file_open(Str8 name, FileAccessFlag flags);
+export function u64 file_size(FileHandle handle);
+export function void file_close(FileHandle handle);
 
-function u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset,
-                          u64 size);
+export function u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset,
+                                 u64 size);
 #define file_read(arena, handle) file_read_ex(arena, handle, 0, NPOS)
 #define file_read_struct(arena, handle, T, offset)                             \
     (T *)file_read_ex(arena, handle, sizeof(T), offset)
 
-function void file_write_ex(FileHandle handle, void *data, u64 offset,
-                            u64 size);
+export function void file_write_ex(FileHandle handle, void *data, u64 offset,
+                                   u64 size);
 #define file_write(handle, data) file_write(handle, data, 0, NPOS)
 #define file_write_struct(handle, struct_ptr, offset)                          \
     file_write_ex(handle, struct_ptr, offset, sizeof(*struct_ptr))
@@ -841,17 +922,20 @@ function void file_write_ex(FileHandle handle, void *data, u64 offset,
 ////////////////////////////////
 // Module: File Watcher
 
-function FileWatcher file_watcher_create(Str8 path, u32 watch_sub_directory);
-function FileEvent *file_watcher_poll_events(FileWatcher *watcher, Arena *arena,
-                                             u32 timeout_ms, u32 *out_count);
-function void file_watcher_destroy(FileWatcher *watcher);
+export function FileWatcher file_watcher_create(Str8 path,
+                                                u32 watch_sub_directory);
+export function FileEvent *file_watcher_poll_events(FileWatcher *watcher,
+                                                    Arena *arena,
+                                                    u32 timeout_ms,
+                                                    u32 *out_count);
+export function void file_watcher_destroy(FileWatcher *watcher);
 
 ////////////////////////////////
 // Module: Lib
 typedef Handle LibHandle;
 
-function LibHandle lib_load(Str8 name);
-function void lib_unload(LibHandle handle);
-function void *lib_get_symbol(LibHandle lib, char *name);
+export function LibHandle lib_load(Str8 name);
+export function void lib_unload(LibHandle handle);
+export function void *lib_get_symbol(LibHandle lib, char *name);
 
 #endif // MSTD_H

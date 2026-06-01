@@ -50,6 +50,16 @@ function force_inline i8 u64_lsb(u64 x) {
 #endif
 
 ////////////////////////////////
+// Math
+
+DEFINE_QUANT(i8)
+DEFINE_QUANT(i16)
+DEFINE_QUANT(i32)
+DEFINE_QUANT(u8)
+DEFINE_QUANT(u16)
+DEFINE_QUANT(u32)
+
+////////////////////////////////
 // Arena
 
 function Arena* arena_alloc_opt(u64 reserve_size, char* file, u32 line, ArenaOpt opt) {
