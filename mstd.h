@@ -74,6 +74,7 @@
 
 #include <math.h>
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -131,6 +132,8 @@
         __VA_ARGS__                                                            \
     } T
 
+#define STATIC_ASSERT _Static_assert
+
 ////////////////////////////////
 // Base Types
 
@@ -154,6 +157,21 @@ typedef unsigned long long uptr;
 typedef int iptr;
 typedef unsigned int uptr;
 #endif
+
+////////////////////////////////
+// Atomics
+
+#define AtomicType _Atomic
+
+typedef AtomicType(u8) atomic_u8;
+typedef AtomicType(u16) atomic_u16;
+typedef AtomicType(u32) atomic_u32;
+typedef AtomicType(u64) atomic_u64;
+
+typedef AtomicType(i8) atomic_i8;
+typedef AtomicType(i16) atomic_i16;
+typedef AtomicType(i32) atomic_i32;
+typedef AtomicType(i64) atomic_i64;
 
 ////////////////////////////////
 // Limits
@@ -363,7 +381,7 @@ DECLARE_QUANT(u32)
         if (!(condition)) {                                                    \
             printf("ASSERT FAILED\nFILE: %s\nLINE: %d\nCONDITION: %s\n",       \
                    __FILE__, __LINE__, #condition);                            \
-            trap(void);                                                        \
+            trap();                                                            \
         }                                                                      \
     } while (0)
 
@@ -373,14 +391,14 @@ DECLARE_QUANT(u32)
             printf("CODE MISMATCH\nFILE: %s\nLINE: %d\nEXPECTED: %s\nACTUAL: " \
                    "%s\n",                                                     \
                    __FILE__, __LINE__, #check, #code);                         \
-            trap(void);                                                        \
+            trap();                                                            \
         }                                                                      \
     } while (0)
 
 #define debug_panic()                                                          \
     do {                                                                       \
         printf("PANIC\nFILE: %s\nLINE: %d\n", __FILE__, __LINE__);             \
-        trap(void);                                                            \
+        trap();                                                                \
     } while (0)
 #else
 #define debug_assert(condition)
@@ -741,98 +759,82 @@ export function Str8View str8_slice_opt(Str8View str, u64 pos, Str8ViewOpt opt);
 #error thread_var not defined for this compiler
 #endif
 
-typedef Handle Thread;
-typedef Handle Mutex;
-typedef Handle RWMutex;
-typedef Handle CondVar;
-typedef Handle Semaphore;
-typedef Handle Barrier;
-typedef void ThreadEntryPointFunctionType(void *user_ptr);
+mem_align_to(64) typedef struct ThreadPrimitive {
+    u8 reserved[64];
+} ThreadPrimitive;
 
-typedef struct Stripe {
-    Arena *arena;
-    RWMutex rw_mutex;
-    CondVar cond_var;
-    void *free;
-} Stripe;
+typedef ThreadPrimitive Thread;
+typedef ThreadPrimitive Mutex;
+typedef ThreadPrimitive RWMutex;
+typedef ThreadPrimitive CondVar;
+typedef ThreadPrimitive Semaphore;
+typedef ThreadPrimitive Barrier;
 
-typedef struct StripeArray {
-    Stripe *stripes;
-    u64 count;
-} StripeArray;
+typedef void ThreadEntryPointFn(void *data);
 
 ////////////////////////////////
 // Threads
 
-export function Thread thread_attach(ThreadEntryPointFunctionType func,
-                                     void *user_data);
-export function u32 thread_join(Thread thread);
-export function void thread_detach(Thread thread);
-export function u32 thread_id(void);
+export function void thread_attach(Thread *thread, ThreadEntryPointFn *func,
+                                   void *data);
+export function u32 thread_join(Thread *thread);
+export function void thread_detach(Thread *thread);
 export function void thread_sleep(u32 ms);
+export function u32 thread_id(void);
 
 ////////////////////////////////
 // Mutex
 
-export function Mutex mutex_create(void);
-export function void mutex_take(Mutex mutex);
-export function void mutex_drop(Mutex mutex);
-export function void mutex_destroy(Mutex mutex);
+export function void mutex_init(Mutex *mutex);
+export function void mutex_take(Mutex *mutex);
+export function void mutex_drop(Mutex *mutex);
+export function void mutex_destroy(Mutex *mutex);
 #define mutex_scope(mutex) scope(mutex_take(mutex), mutex_drop(mutex));
 
 ////////////////////////////////
 // Read write mutex
 
-export function RWMutex rw_mutex_create(void);
-export function void rw_mutex_take(RWMutex mutex, u32 write_mode);
-export function void rw_mutex_drop(RWMutex mutex, u32 write_mode);
-export function void rw_mutex_destroy(RWMutex mutex);
-#define rw_mutex_take_r(mutex) rw_mutex_take((mutex), (0))
-#define rw_mutex_take_w(mutex) rw_mutex_take((mutex), (1))
-#define rw_mutex_drop_r(mutex) rw_mutex_drop((mutex), (0))
-#define rw_mutex_drop_w(mutex) rw_mutex_drop((mutex), (1))
-#define rw_mutex_scope_r(mutex)                                                \
-    scope(rw_mutex_take_r(mutex), rw_mutex_drop_r(mutex))
-#define rw_mutex_scope_w(mutex)                                                \
-    scope(rw_mutex_take_w(mutex), rw_mutex_drop_w(mutex))
+export function void rw_mutex_create(RWMutex *mutex);
+export function void rw_mutex_take(RWMutex *mutex, u32 write_mode);
+export function void rw_mutex_drop(RWMutex *mutex, u32 write_mode);
+export function void rw_mutex_destroy(RWMutex *mutex);
 
 ////////////////////////////////
 // Condition Variables
 
-export function CondVar cond_var_create(void);
-export function u32 cond_var_wait(CondVar var, Mutex mutex);
-export function u32 cond_var_wait_rw(CondVar var, RWMutex mutex,
+export function void cond_var_init(CondVar *var);
+export function u32 cond_var_wait(CondVar *var, Mutex *mutex);
+export function u32 cond_var_wait_rw(CondVar *var, RWMutex *mutex,
                                      u32 write_mode);
-export function void cond_var_signal(CondVar var);
-export function void cond_var_broadcast(CondVar var);
-export function void cond_var_destroy(CondVar var);
+export function void cond_var_signal(CondVar *var);
+export function void cond_var_broadcast(CondVar *var);
+export function void cond_var_destroy(CondVar *var);
+
 #define cond_var_wait_r(var, mutex) cond_var_wait_rw((var), (mutex), (0))
 #define cond_var_wait_w(var, mutex) cond_var_wait_rw((var), (mutex), (1))
 
-////////////////////////////////
-// Semaphore
+// ////////////////////////////////
+// // Semaphore
 
-export function Semaphore semaphore_create(u32 initial_count, u32 max_count,
-                                           Str8 name);
-export function Semaphore semaphore_open(Str8 name);
-export function void semaphore_close(Semaphore semaphore);
-export function u32 semaphore_take(Semaphore semaphore);
-export function void semaphore_drop(Semaphore semaphore);
-export function void semaphore_destroy(Semaphore semaphore);
+export function void semaphore_init(Semaphore *semaphore, u32 initial_count,
+                                    u32 max_count);
+export function u32 semaphore_take(Semaphore *semaphore);
+export function void semaphore_drop(Semaphore *semaphore);
+export function void semaphore_destroy(Semaphore *semaphore);
 
-////////////////////////////////
-// Barriers
+// ////////////////////////////////
+// // Barriers
 
-export function Barrier barrier_create(u64 count);
-export function void barrier_wait(Barrier barrier);
-export function void barrier_destroy(Barrier barrier);
+export function void barrier_init(Barrier *barrier, u32 count);
+export function void barrier_wait(Barrier *barrier);
+export function void barrier_destroy(Barrier *barrier);
 
 ////////////////////////////////
-// Stripe Array
+// Hardware Atomics wait-on-address
 
-export function StripeArray stripe_array_alloc(Arena *arena);
-export function void stripe_array_release(StripeArray *array);
-export function Stripe *stripe_array_get_stripe(StripeArray *array, u64 idx);
+export function void atomic_wait_u32(atomic_u32 *addr, u32 expected_value);
+export function void atomic_wake_single(atomic_u32 *addr);
+export function void atomic_wake_all(atomic_u32 *addr);
 
 ////////////////////////////////
 // Module: CLI

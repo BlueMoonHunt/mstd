@@ -655,22 +655,6 @@ function Str32 str32_from_8(Arena* arena, Str8 str) {
 }
 
 ////////////////////////////////
-// Module: Thread
-
-function void stripe_array_release(StripeArray* array) {
-    for (u32 i = 0; i < array->count; i++) {
-        arena_release(array->stripes[i].arena);
-        rw_mutex_destroy(array->stripes[i].rw_mutex);
-        cond_var_destroy(array->stripes[i].cond_var);
-    }
-}
-
-function Stripe* stripe_array_get_stripe(StripeArray* array, u64 idx) {
-    Stripe* stripe = &array->stripes[idx % array->count];
-    return stripe;
-}
-
-////////////////////////////////
 // Module: Timer
 
 function Timer timer_start(void) {
