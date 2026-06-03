@@ -117,7 +117,21 @@ function void thread_detach(Thread *thread) {
 
 function u32 thread_id(void) { return (u32)GetCurrentThreadId(); }
 
-function void thread_sleep(u32 ms) { Sleep((DWORD)ms); }
+function void thread_sleep(u32 ms) {
+    if (ms == 0) { SwitchToThread(); return; }
+    static HANDLE s_timer = NULL;
+
+    if (!s_timer)
+        s_timer = CreateWaitableTimerExW(NULL, NULL,
+                                         CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
+                                         TIMER_ALL_ACCESS);
+    if (s_timer) {
+        LARGE_INTEGER due;
+        due.QuadPart = -(LONGLONG)ms * 10000;
+        SetWaitableTimer(s_timer, &due, 0, NULL, NULL, FALSE);
+        WaitForSingleObject(s_timer, INFINITE);
+    }
+}
 
 ////////////////////////////////
 // Mutex

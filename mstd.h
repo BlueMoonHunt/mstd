@@ -794,7 +794,7 @@ export function void mutex_destroy(Mutex *mutex);
 ////////////////////////////////
 // Read write mutex
 
-export function void rw_mutex_create(RWMutex *mutex);
+export function void rw_mutex_init(RWMutex *mutex);
 export function void rw_mutex_take(RWMutex *mutex, u32 write_mode);
 export function void rw_mutex_drop(RWMutex *mutex, u32 write_mode);
 export function void rw_mutex_destroy(RWMutex *mutex);
