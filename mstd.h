@@ -105,8 +105,10 @@
 #define function
 #define internal static
 
+#define expose __declspec(dllexport) __stdcall
+
 #if MSTD_DLL
-#define export __declspec(dllexport) __stdcall
+#define export expose
 #else
 #define export
 #endif
@@ -924,7 +926,7 @@ export function void file_write_ex(FileHandle handle, void *data, u64 offset,
 ////////////////////////////////
 // Module: File Watcher
 
-export function FileWatcher file_watcher_create(Str8 path,
+export function FileWatcher* file_watcher_create(Arena* arena, Str8 path,
                                                 u32 watch_sub_directory);
 export function FileEvent *file_watcher_poll_events(FileWatcher *watcher,
                                                     Arena *arena,
@@ -938,6 +940,6 @@ typedef Handle LibHandle;
 
 export function LibHandle lib_load(Str8 name);
 export function void lib_unload(LibHandle handle);
-export function void *lib_get_symbol(LibHandle lib, char *name);
+export function void *lib_get_symbol(LibHandle lib, Str8 name);
 
 #endif // MSTD_H

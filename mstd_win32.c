@@ -474,9 +474,9 @@ struct Win32FileWatcher {
     u32 scan_sub_directories;
 };
 
-function FileWatcher file_watcher_create(Str8 path, u32 watch_sub_directory) {
-    Arena *arena = arena_scratch_alloc();
-    Str16 u16_path = str16_from_8(arena, path);
+function FileWatcher* file_watcher_create(Arena* arena, Str8 path, u32 watch_sub_directory) {
+    Arena *scratch = arena_scratch_alloc();
+    Str16 u16_path = str16_from_8(scratch, path);
 
     HANDLE dir = CreateFileW(
         (LPCWSTR)u16_path.data, FILE_LIST_DIRECTORY,
@@ -486,7 +486,7 @@ function FileWatcher file_watcher_create(Str8 path, u32 watch_sub_directory) {
     struct Win32FileWatcher watcher = {0};
 
     if (dir == INVALID_HANDLE_VALUE)
-        return (watcher);
+        return NULL;
 
     watcher.scan_sub_directories = watch_sub_directory;
     watcher.dir_handle = dir;
@@ -498,8 +498,9 @@ function FileWatcher file_watcher_create(Str8 path, u32 watch_sub_directory) {
         FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME, NULL,
         &watcher.overlapped, NULL);
 
-    arena_scratch_release(arena);
-    return (watcher);
+    arena_scratch_release(scratch);
+    FileWatcher* result = (FileWatcher*) arena_push_struct(arena, struct Win32FileWatcher);
+    return (result);
 }
 
 function FileEvent *file_watcher_poll_events(FileWatcher *watcher, Arena *arena,
@@ -612,6 +613,6 @@ function void lib_unload(LibHandle handle) {
     FreeLibrary((HMODULE)handle.val[0]);
 }
 
-function void *lib_get_symbol(LibHandle lib, char *name) {
-    return (void *)GetProcAddress((HMODULE)lib.val[0], (LPCSTR)name);
+function void *lib_get_symbol(LibHandle lib, Str8 name) {
+    return (void *)GetProcAddress((HMODULE)lib.val[0], (LPCSTR)name.data);
 }
