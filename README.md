@@ -62,3 +62,8 @@ int main() {
 
 #include "mstd.c"
 ```
+
+## TODO
+* Add custom IO to unify Str8 and Str8View to take away null terminator guarantee in Str8.
+* Add Linux layer.
+* General Arena with more options. Current one is fix sized does not have customizing options like grow / overflow handeling.
