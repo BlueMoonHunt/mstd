@@ -11,7 +11,7 @@
 ////////////////////////////////
 // Module: Memory
 
-function void *mem_reserve(u64 size, u32 large_pages) {
+internal void *mem_reserve(u64 size, u32 large_pages) {
     void *result =
         (large_pages)
             ? VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT | MEM_LARGE_PAGES,
@@ -20,7 +20,7 @@ function void *mem_reserve(u64 size, u32 large_pages) {
     return result;
 }
 
-function u8 mem_commit(void *ptr, u64 size, u32 large_pages) {
+internal u8 mem_commit(void *ptr, u64 size, u32 large_pages) {
     u8 result =
         (large_pages)
             ? 1
@@ -28,52 +28,118 @@ function u8 mem_commit(void *ptr, u64 size, u32 large_pages) {
     return result;
 }
 
-function void mem_decommit(void *ptr, u64 size) {
+internal void mem_decommit(void *ptr, u64 size) {
     VirtualFree(ptr, size, MEM_DECOMMIT);
 }
 
-function void mem_release(void *ptr, u64 size) {
+internal void mem_release(void *ptr, u64 size) {
     (void)size;
     VirtualFree(ptr, 0, MEM_RELEASE);
 }
 
-function u64 mem_page_size(void) {
+internal u64 mem_page_size(void) {
     SYSTEM_INFO sysinfo = {0};
     GetSystemInfo(&sysinfo);
     return sysinfo.dwPageSize;
 }
 
-function u64 mem_large_page_size(void) { return GetLargePageMinimum(); }
+internal u64 mem_large_page_size(void) { return GetLargePageMinimum(); }
 
 ////////////////////////////////
-// CLI
+// Module: Cmd
 
-function void cli_attach_if_exists(void) {
-    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
-        HANDLE hOut =
-            CreateFileA("CONOUT$", GENERIC_READ | GENERIC_WRITE,
-                        FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
-        HANDLE hIn = CreateFileA("CONIN$", GENERIC_READ | GENERIC_WRITE,
-                                 FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-
-        debug_assert(hOut != INVALID_HANDLE_VALUE);
-        debug_assert(hIn != INVALID_HANDLE_VALUE);
-
-        SetStdHandle(STD_OUTPUT_HANDLE, hOut);
-        SetStdHandle(STD_ERROR_HANDLE, hOut);
-        SetStdHandle(STD_INPUT_HANDLE, hIn);
-
+internal void cmd_cli_alloc(u32 if_not_exists) {
+    if ((if_not_exists) ? AllocConsole() : AttachConsole(ATTACH_PARENT_PROCESS)) {
         FILE *dummy;
         freopen_s(&dummy, "CONOUT$", "w", stdout);
         freopen_s(&dummy, "CONOUT$", "w", stderr);
         freopen_s(&dummy, "CONIN$", "r", stdin);
 
-        DWORD mode = 0;
-        if (GetConsoleMode(hOut, &mode)) {
-            mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-            SetConsoleMode(hOut, mode);
+        setvbuf(stdout, NULL, _IONBF, 0);
+        setvbuf(stderr, NULL, _IONBF, 0);
+    }
+}
+
+internal u32 cmd_run_opt(char *command, CmdOpt opt) {
+    Arena *scratch = arena_scratch_alloc();
+    char *prefix = "powershell -Command";
+    char *cmd_str =
+        (char *)str8_from_fmt(scratch, "%s %s", prefix, command).data;
+
+    STARTUPINFOA si = {0};
+    si.cb = sizeof(si);
+
+    HANDLE nul = INVALID_HANDLE_VALUE;
+
+    if (!opt.hidden && GetConsoleWindow()) {
+        si.dwFlags |= STARTF_USESTDHANDLES;
+        si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+        si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+        si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+    } else {
+        SECURITY_ATTRIBUTES sa = {
+            .nLength = sizeof(SECURITY_ATTRIBUTES),
+            .lpSecurityDescriptor = NULL,
+            .bInheritHandle = TRUE,
+        };
+        nul = CreateFileA("NUL", GENERIC_WRITE,
+                          FILE_SHARE_WRITE | FILE_SHARE_READ, &sa,
+                          OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+        if (nul != INVALID_HANDLE_VALUE) {
+            si.dwFlags |= STARTF_USESTDHANDLES;
+            si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+            si.hStdOutput = nul;
+            si.hStdError = nul;
         }
     }
+
+    DWORD flags = NORMAL_PRIORITY_CLASS;
+    switch ((CmdPiority)opt.priority) {
+    case CMD_PRIORITY_IDLE:
+        flags = IDLE_PRIORITY_CLASS;
+        break;
+    case CMD_PRIORITY_HIGH:
+        flags = HIGH_PRIORITY_CLASS;
+        break;
+    case CMD_PRIORITY_REALTIME:
+        flags = REALTIME_PRIORITY_CLASS;
+        break;
+    default:
+        break;
+    }
+
+    if (opt.hidden || !GetConsoleWindow())
+        flags |= CREATE_NO_WINDOW;
+
+    if (opt.run_ditached) {
+        flags &= ~CREATE_NO_WINDOW;
+        flags |= DETACHED_PROCESS;
+    }
+
+    BOOL inherit =
+        (si.dwFlags & STARTF_USESTDHANDLES) ? TRUE : (BOOL)opt.inherit_handles;
+
+    PROCESS_INFORMATION pi = {0};
+    BOOL ok = CreateProcessA(NULL, cmd_str, NULL, NULL, inherit, flags, NULL,
+                             NULL, &si, &pi);
+
+    if (nul != INVALID_HANDLE_VALUE)
+        CloseHandle(nul);
+
+    u32 result = 1;
+
+    if (!ok)
+        result = 0;
+
+    if (!opt.run_ditached)
+        WaitForSingleObject(pi.hProcess, INFINITE);
+
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    arena_scratch_release(scratch);
+
+    return result;
 }
 
 ////////////////////////////////
@@ -94,7 +160,7 @@ internal DWORD WINAPI Win32_ThreadTrampoline(LPVOID param) {
     return 0;
 }
 
-function void thread_attach(Thread *thread, ThreadEntryPointFn *func,
+internal void thread_attach(Thread *thread, ThreadEntryPointFn *func,
                             void *data) {
     Win32ThreadCtx *ctx = (Win32ThreadCtx *)&thread->reserved;
     ctx->user_func = func;
@@ -103,21 +169,21 @@ function void thread_attach(Thread *thread, ThreadEntryPointFn *func,
         CreateThread(NULL, 0, Win32_ThreadTrampoline, ctx, 0, &ctx->id);
 }
 
-function u32 thread_join(Thread *thread) {
+internal u32 thread_join(Thread *thread) {
     Win32ThreadCtx *ctx = (Win32ThreadCtx *)thread->reserved;
     DWORD result = WaitForSingleObject(ctx->handle, INFINITE);
     CloseHandle(ctx->handle);
     return (result == WAIT_OBJECT_0);
 }
 
-function void thread_detach(Thread *thread) {
+internal void thread_detach(Thread *thread) {
     Win32ThreadCtx *ctx = (Win32ThreadCtx *)thread->reserved;
     CloseHandle(ctx->handle);
 }
 
-function u32 thread_id(void) { return (u32)GetCurrentThreadId(); }
+internal u32 thread_id(void) { return (u32)GetCurrentThreadId(); }
 
-function void thread_sleep(u32 ms) {
+internal void thread_sleep(u32 ms) {
     if (ms == 0) { SwitchToThread(); return; }
     static HANDLE s_timer = NULL;
 
@@ -136,30 +202,30 @@ function void thread_sleep(u32 ms) {
 ////////////////////////////////
 // Mutex
 
-function void mutex_init(Mutex *mutex) {
+internal void mutex_init(Mutex *mutex) {
     InitializeCriticalSection((LPCRITICAL_SECTION)mutex->reserved);
 }
 
-function void mutex_take(Mutex *mutex) {
+internal void mutex_take(Mutex *mutex) {
     EnterCriticalSection((LPCRITICAL_SECTION)mutex->reserved);
 }
 
-function void mutex_drop(Mutex *mutex) {
+internal void mutex_drop(Mutex *mutex) {
     LeaveCriticalSection((LPCRITICAL_SECTION)mutex->reserved);
 }
 
-function void mutex_destroy(Mutex *mutex) {
+internal void mutex_destroy(Mutex *mutex) {
     DeleteCriticalSection((LPCRITICAL_SECTION)mutex->reserved);
 }
 
 ////////////////////////////////
 // Read/Write Mutex
 
-function void rw_mutex_init(RWMutex *mutex) {
+internal void rw_mutex_init(RWMutex *mutex) {
     InitializeSRWLock((PSRWLOCK)mutex->reserved);
 }
 
-function void rw_mutex_take(RWMutex *mutex, u32 write_mode) {
+internal void rw_mutex_take(RWMutex *mutex, u32 write_mode) {
     if (write_mode) {
         AcquireSRWLockExclusive((PSRWLOCK)mutex->reserved);
     } else {
@@ -167,7 +233,7 @@ function void rw_mutex_take(RWMutex *mutex, u32 write_mode) {
     }
 }
 
-function void rw_mutex_drop(RWMutex *mutex, u32 write_mode) {
+internal void rw_mutex_drop(RWMutex *mutex, u32 write_mode) {
     if (write_mode) {
         ReleaseSRWLockExclusive((PSRWLOCK)mutex->reserved);
     } else {
@@ -176,23 +242,23 @@ function void rw_mutex_drop(RWMutex *mutex, u32 write_mode) {
 }
 
 // SRWLOCK does not require explicit destruction on Windows.
-function void rw_mutex_destroy(RWMutex *mutex) { (void)mutex; }
+internal void rw_mutex_destroy(RWMutex *mutex) { (void)mutex; }
 
 ////////////////////////////////
 // Condition Variable
 
-function void cond_var_init(CondVar *var) {
+internal void cond_var_init(CondVar *var) {
     InitializeConditionVariable((PCONDITION_VARIABLE)var->reserved);
 }
 
-function u32 cond_var_wait(CondVar *var, Mutex *mutex) {
+internal u32 cond_var_wait(CondVar *var, Mutex *mutex) {
     BOOL result =
         SleepConditionVariableCS((PCONDITION_VARIABLE)var->reserved,
                                  (PCRITICAL_SECTION)mutex->reserved, INFINITE);
     return (u32)result;
 }
 
-function u32 cond_var_wait_rw(CondVar *var, RWMutex *mutex, u32 write_mode) {
+internal u32 cond_var_wait_rw(CondVar *var, RWMutex *mutex, u32 write_mode) {
     ULONG flags = write_mode ? 0 : CONDITION_VARIABLE_LOCKMODE_SHARED;
     BOOL result =
         SleepConditionVariableSRW((PCONDITION_VARIABLE)var->reserved,
@@ -200,39 +266,39 @@ function u32 cond_var_wait_rw(CondVar *var, RWMutex *mutex, u32 write_mode) {
     return (u32)result;
 }
 
-function void cond_var_signal(CondVar *var) {
+internal void cond_var_signal(CondVar *var) {
     WakeConditionVariable((PCONDITION_VARIABLE)var->reserved);
 }
 
-function void cond_var_broadcast(CondVar *var) {
+internal void cond_var_broadcast(CondVar *var) {
     WakeAllConditionVariable((PCONDITION_VARIABLE)var->reserved);
 }
 
 // CONDITION_VARIABLE does not require explicit destruction on Windows.
-function void cond_var_destroy(CondVar *var) { (void)var; }
+internal void cond_var_destroy(CondVar *var) { (void)var; }
 
 ////////////////////////////////
 // Semaphore
 
-function void semaphore_init(Semaphore *semaphore, u32 initial_count,
+internal void semaphore_init(Semaphore *semaphore, u32 initial_count,
                              u32 max_count) {
     HANDLE handle =
         CreateSemaphoreW(NULL, (LONG)initial_count, (LONG)max_count, NULL);
     *((HANDLE *)semaphore->reserved) = handle;
 }
 
-function u32 semaphore_take(Semaphore *semaphore) {
+internal u32 semaphore_take(Semaphore *semaphore) {
     HANDLE handle = *((HANDLE *)semaphore->reserved);
     DWORD result = WaitForSingleObject(handle, INFINITE);
     return (result == WAIT_OBJECT_0);
 }
 
-function void semaphore_drop(Semaphore *semaphore) {
+internal void semaphore_drop(Semaphore *semaphore) {
     HANDLE handle = *((HANDLE *)semaphore->reserved);
     ReleaseSemaphore(handle, 1, NULL);
 }
 
-function void semaphore_destroy(Semaphore *semaphore) {
+internal void semaphore_destroy(Semaphore *semaphore) {
     HANDLE handle = *((HANDLE *)semaphore->reserved);
     CloseHandle(handle);
 }
@@ -240,40 +306,40 @@ function void semaphore_destroy(Semaphore *semaphore) {
 ////////////////////////////////
 // Barriers
 
-function void barrier_init(Barrier *barrier, u32 count) {
+internal void barrier_init(Barrier *barrier, u32 count) {
     InitializeSynchronizationBarrier(
         (LPSYNCHRONIZATION_BARRIER)barrier->reserved, (LONG)count, -1);
 }
 
-function void barrier_wait(Barrier *barrier) {
+internal void barrier_wait(Barrier *barrier) {
     EnterSynchronizationBarrier((LPSYNCHRONIZATION_BARRIER)barrier->reserved,
                                 0);
 }
 
-function void barrier_destroy(Barrier *barrier) {
+internal void barrier_destroy(Barrier *barrier) {
     DeleteSynchronizationBarrier((LPSYNCHRONIZATION_BARRIER)barrier->reserved);
 }
 
 ////////////////////////////////
 // Hardware Atomics wait-on-address
 
-function void atomic_wait_u32(atomic_u32 *addr, u32 expected_value) {
+internal void atomic_wait_u32(atomic_u32 *addr, u32 expected_value) {
     WaitOnAddress((volatile PVOID)addr, (PVOID)&expected_value, sizeof(u32),
                   INFINITE);
 }
 
-function void atomic_wake_single(atomic_u32 *addr) {
+internal void atomic_wake_single(atomic_u32 *addr) {
     WakeByAddressSingle((PVOID)addr);
 }
 
-function void atomic_wake_all(atomic_u32 *addr) {
+internal void atomic_wake_all(atomic_u32 *addr) {
     WakeByAddressAll((PVOID)addr);
 }
 
 ////////////////////////////////
 // Module: File
 
-function u32 file_delete(Str8 path) {
+internal u32 file_delete(Str8 path) {
     int max_retries = 5;
     int sleep_ms = 1;
 
@@ -291,18 +357,19 @@ function u32 file_delete(Str8 path) {
     return 0;
 }
 
-function u32 file_copy(Str8 src, Str8 dest) {
+internal u32 file_copy(Str8 src, Str8 dest) {
     int max_retries = 5;
     int sleep_ms = 1;
 
     for (int i = 0; i < max_retries; i++) {
         if (CopyFileExA((char *)src.data, (char *)dest.data, NULL, NULL, FALSE,
-                        COPY_FILE_NO_BUFFERING))
+                        0))
             return 1;
 
         DWORD err = GetLastError();
-        if (err == ERROR_SHARING_VIOLATION || err == ERROR_LOCK_VIOLATION) {
-            Sleep(sleep_ms);
+        if (err == ERROR_SHARING_VIOLATION || err == ERROR_ACCESS_DENIED ||
+            err == ERROR_LOCK_VIOLATION) {
+            thread_sleep(sleep_ms);
             sleep_ms *= 2;
         } else
             break;
@@ -311,7 +378,7 @@ function u32 file_copy(Str8 src, Str8 dest) {
     return 0;
 }
 
-function u32 file_move(Str8 src, Str8 dest) {
+internal u32 file_move(Str8 src, Str8 dest) {
     int max_retries = 5;
     int sleep_ms = 1;
 
@@ -332,21 +399,21 @@ function u32 file_move(Str8 src, Str8 dest) {
     return 0;
 }
 
-function u32 file_exists(Str8 path) {
+internal u32 file_exists(Str8 path) {
     DWORD attributes = GetFileAttributesA((char *)path.data);
     u32 exists = (attributes != INVALID_FILE_ATTRIBUTES) &&
                  !!(~attributes & FILE_ATTRIBUTE_DIRECTORY);
     return exists;
 }
 
-function u32 file_directory_exists(Str8 path) {
+internal u32 file_directory_exists(Str8 path) {
     DWORD attributes = GetFileAttributesA((char *)path.data);
     u32 exists = (attributes != INVALID_FILE_ATTRIBUTES) &&
                  (attributes & FILE_ATTRIBUTE_DIRECTORY);
     return exists;
 }
 
-function FileHandle file_open(Str8 name, FileAccessFlag flags) {
+internal FileHandle file_open(Str8 name, FileAccessFlag flags) {
     FileHandle result = {0};
     Arena *arena = arena_scratch_alloc();
     Str16 path_w32 = str16_from_8(arena, name);
@@ -387,17 +454,17 @@ function FileHandle file_open(Str8 name, FileAccessFlag flags) {
     return result;
 }
 
-function u64 file_size(FileHandle handle) {
+internal u64 file_size(FileHandle handle) {
     u64 size = 0;
     GetFileSizeEx((HANDLE)handle.val[0], (LARGE_INTEGER *)&size);
     return size;
 }
 
-function void file_close(FileHandle handle) {
+internal void file_close(FileHandle handle) {
     CloseHandle((HANDLE)handle.val[0]);
 }
 
-function u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset,
+internal u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset,
                           u64 size) {
     u64 total_read_size = 0;
 
@@ -433,7 +500,7 @@ function u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset,
     return 0;
 }
 
-function void file_write_ex(FileHandle handle, void *data, u64 offset,
+internal void file_write_ex(FileHandle handle, void *data, u64 offset,
                             u64 size) {
     u64 total_written = 0;
 
@@ -474,7 +541,7 @@ struct Win32FileWatcher {
     u32 scan_sub_directories;
 };
 
-function FileWatcher* file_watcher_create(Arena* arena, Str8 path, u32 watch_sub_directory) {
+internal FileWatcher* file_watcher_create(Arena* arena, Str8 path, u32 watch_sub_directory) {
     Arena *scratch = arena_scratch_alloc();
     Str16 u16_path = str16_from_8(scratch, path);
 
@@ -503,7 +570,7 @@ function FileWatcher* file_watcher_create(Arena* arena, Str8 path, u32 watch_sub
     return (result);
 }
 
-function FileEvent *file_watcher_poll_events(FileWatcher *watcher, Arena *arena,
+internal FileEvent *file_watcher_poll_events(FileWatcher *watcher, Arena *arena,
                                              u32 timeout_ms, u32 *out_count) {
     DWORD bytes = 0;
     ULONG_PTR key = 0;
@@ -574,7 +641,7 @@ function FileEvent *file_watcher_poll_events(FileWatcher *watcher, Arena *arena,
     return result_array;
 }
 
-function void file_watcher_destroy(FileWatcher *watcher) {
+internal void file_watcher_destroy(FileWatcher *watcher) {
     debug_assert(watcher);
     CloseHandle(watcher->iocp);
     CloseHandle(watcher->dir_handle);
@@ -583,14 +650,14 @@ function void file_watcher_destroy(FileWatcher *watcher) {
 ////////////////////////////////
 // Module: Clock
 
-function u64 clock_resolution_us(void) {
+internal u64 clock_resolution_us(void) {
     LARGE_INTEGER resolution;
     if (QueryPerformanceFrequency(&resolution))
         return (resolution.QuadPart);
     return 1;
 }
 
-function u64 clock_ticks_now(void) {
+internal u64 clock_ticks_now(void) {
     LARGE_INTEGER counter;
     QueryPerformanceCounter(&counter);
     return (u64)(counter.QuadPart);
@@ -599,7 +666,7 @@ function u64 clock_ticks_now(void) {
 ////////////////////////////////
 // Module: Lib
 
-function LibHandle lib_load(Str8 name) {
+internal LibHandle lib_load(Str8 name) {
     LibHandle handle = {0};
     arena_scratch_scope(scratch) {
         Str16 name16 = str16_from_8(scratch, name);
@@ -609,10 +676,10 @@ function LibHandle lib_load(Str8 name) {
     return handle;
 }
 
-function void lib_unload(LibHandle handle) {
+internal void lib_unload(LibHandle handle) {
     FreeLibrary((HMODULE)handle.val[0]);
 }
 
-function void *lib_get_symbol(LibHandle lib, Str8 name) {
+internal void *lib_get_symbol(LibHandle lib, Str8 name) {
     return (void *)GetProcAddress((HMODULE)lib.val[0], (LPCSTR)name.data);
 }

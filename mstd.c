@@ -9,40 +9,40 @@
 
 #if COMPILER_MSVC
 
-function force_inline u8 u32_count_zerol(u32 x) {
+internal force_inline u8 u32_count_zerol(u32 x) {
     unsigned long zeros = 0;
     return _BitScanReverse(&zeros, x) ? (u8)(31 - zeros) : 32;
 }
-function force_inline u8 u64_count_zerol(u64 x) {
+internal force_inline u8 u64_count_zerol(u64 x) {
     unsigned long zeros = 0;
     return _BitScanReverse64(&zeros, x) ? (u8)(63 - zeros) : 64;
 }
 
-function force_inline u8 u32_count_zeror(u32 x) {
+internal force_inline u8 u32_count_zeror(u32 x) {
     unsigned long zeros = 0;
     _BitScanForward(&zeros, x);
     return (u8)zeros;
 }
-function force_inline u8 u64_count_zeror(u64 x) {
+internal force_inline u8 u64_count_zeror(u64 x) {
     unsigned long zeros = 0;
     _BitScanForward64(&zeros, x);
     return (u8)zeros;
 }
 
-function force_inline i8 u32_msb(u32 x) {
+internal force_inline i8 u32_msb(u32 x) {
     unsigned long where;
     return _BitScanReverse(&where, x) ? (i8)where : -1;
 }
-function force_inline i8 u64_msb(u64 x) {
+internal force_inline i8 u64_msb(u64 x) {
     unsigned long where;
     return _BitScanReverse64(&where, x) ? (i8)where : -1;
 }
 
-function force_inline i8 u32_lsb(u32 x) {
+internal force_inline i8 u32_lsb(u32 x) {
     unsigned long where;
     return _BitScanForward(&where, x) ? (i8)where : -1;
 }
-function force_inline i8 u64_lsb(u64 x) {
+internal force_inline i8 u64_lsb(u64 x) {
     unsigned long where;
     return _BitScanForward64(&where, x) ? (i8)where : -1;
 }
@@ -62,7 +62,7 @@ DEFINE_QUANT(u32)
 ////////////////////////////////
 // Arena
 
-function Arena* arena_alloc_opt(u64 reserve_size, char* file, u32 line, ArenaOpt opt) {
+internal Arena* arena_alloc_opt(u64 reserve_size, char* file, u32 line, ArenaOpt opt) {
     u64 page_size = (opt.large_pages) ? mem_large_page_size() : mem_page_size();
     debug_assert(page_size);
 
@@ -93,12 +93,12 @@ function Arena* arena_alloc_opt(u64 reserve_size, char* file, u32 line, ArenaOpt
     return arena;
 }
 
-function void arena_release(Arena* arena) {
+internal void arena_release(Arena* arena) {
     debug_assert(arena);
     mem_release(arena, arena->reserved);
 }
 
-function void* arena_push(Arena* arena, u64 size, u64 align) {
+internal void* arena_push(Arena* arena, u64 size, u64 align) {
     debug_assert(arena);
     u64 begin_pos = align_up_pow2(arena->cursor, align);
     u64 end_pos = begin_pos + size;
@@ -118,7 +118,7 @@ function void* arena_push(Arena* arena, u64 size, u64 align) {
     return user_ptr;
 }
 
-function void arena_reset(Arena* arena) {
+internal void arena_reset(Arena* arena) {
     debug_assert(arena);
 
     if (arena->temp_stack_head)
@@ -127,21 +127,13 @@ function void arena_reset(Arena* arena) {
         arena->cursor = ARENA_HEADER_SIZE;
 }
 
-function void arena_reset_forced(Arena* arena) {
-    debug_assert(arena);
-
-    arena->temp_stack_head = 0;
-    arena->temp_stack_tail = 0;
-    arena->cursor = ARENA_HEADER_SIZE;
-}
-
-function void arena_temp_push(Arena* arena) {
+internal void arena_temp_push(Arena* arena) {
     debug_assert(arena);
     ArenaTempNode* node = arena_push_struct(arena, ArenaTempNode);
     sll_stack_push(arena->temp_stack_head, arena->temp_stack_tail, node);
 }
 
-function void arena_temp_pop(Arena* arena) {
+internal void arena_temp_pop(Arena* arena) {
     debug_assert(arena);
 
     if (arena->temp_stack_head) {
@@ -151,7 +143,7 @@ function void arena_temp_pop(Arena* arena) {
     }
 }
 
-function void arena_temp_pop_all(Arena* arena) {
+internal void arena_temp_pop_all(Arena* arena) {
     debug_assert(arena);
 
     if (arena->temp_stack_tail) {
@@ -161,18 +153,18 @@ function void arena_temp_pop_all(Arena* arena) {
     }
 }
 
-#define ARENA_SCRATCH_POOL_COUNT 2
+#define ARENA_SCRATCH_POOL_COUNT 4
 
 global thread_var Arena* arena_scratch_pool[ARENA_SCRATCH_POOL_COUNT] = { 0 };
 global thread_var u8     arena_scratch_pool_available_mask = (1u << ARENA_SCRATCH_POOL_COUNT) - 1;
 
-function Arena* arena_scratch_alloc(void) {
+internal Arena* arena_scratch_alloc(void) {
     i32 index = u32_lsb((u32)arena_scratch_pool_available_mask);
 
     if (index >= 0 && index < ARENA_SCRATCH_POOL_COUNT) {
         Arena* arena = arena_scratch_pool[index];
         if (arena == 0) {
-            arena = arena_alloc(MB(100));
+            arena = arena_alloc(ARENA_DEFAULT_RESERVE_SIZE);
             arena_scratch_pool[index] = arena;
         }
         arena_reset(arena);
@@ -182,7 +174,7 @@ function Arena* arena_scratch_alloc(void) {
     return 0;
 }
 
-function void arena_scratch_release(Arena* arena) {
+internal void arena_scratch_release(Arena* arena) {
     debug_assert(arena);
 
     for (i32 i = 0; i < ARENA_SCRATCH_POOL_COUNT; ++i) {
@@ -197,7 +189,7 @@ function void arena_scratch_release(Arena* arena) {
 ////////////////////////////////
 // Strings
 
-function Str8 str8_from_cstr(u8* str) {
+internal Str8 str8_from_cstr(u8* str) {
     u64 size = 0;
     for (;str[size] != 0; size++);
 
@@ -208,7 +200,7 @@ function Str8 str8_from_cstr(u8* str) {
     return result;
 }
 
-function Str8 str8_from_mem_size(Arena* arena, u64 size) {
+internal Str8 str8_from_mem_size(Arena* arena, u64 size) {
     debug_assert(arena);
 
     Str8 result = { 0 };
@@ -220,7 +212,7 @@ function Str8 str8_from_mem_size(Arena* arena, u64 size) {
     return result;
 }
 
-function Str8 str8_from_fmt(Arena *arena, char* fmt, ...) {
+internal Str8 str8_from_fmt(Arena *arena, char* fmt, ...) {
     Str8 result = {0};
 
     va_list args;
@@ -240,7 +232,7 @@ function Str8 str8_from_fmt(Arena *arena, char* fmt, ...) {
     return result;
 }
 
-function Str8 str8_concat_args_till_str_npos(Arena* arena, ...) {
+internal Str8 str8_concat_args_till_str_npos(Arena* arena, ...) {
     va_list args;
     u64 size = 0;
 
@@ -267,7 +259,7 @@ function Str8 str8_concat_args_till_str_npos(Arena* arena, ...) {
     return (Str8){.size = size, .data = buffer};
 }
 
-function Str8 str8_concat(Arena* arena, Str8 a, Str8 b) {
+internal Str8 str8_concat(Arena* arena, Str8 a, Str8 b) {
     debug_assert(arena);
     Str8 result = str8_from_mem_size(arena, a.size + b.size);
 
@@ -278,7 +270,7 @@ function Str8 str8_concat(Arena* arena, Str8 a, Str8 b) {
     return result;
 }
 
-function u32 str8_match_opt(Str8 a, Str8 b, Str8MatchOpt opt) {
+internal u32 str8_match_opt(Str8 a, Str8 b, Str8MatchOpt opt) {
     u32 match = 0;
 
     if (a.size == b.size && (opt.case_insensitive || opt.slash_insensitive)) {
@@ -305,7 +297,7 @@ function u32 str8_match_opt(Str8 a, Str8 b, Str8MatchOpt opt) {
     return match;
 }
 
-function u64 str8_find_opt(Str8 string, Str8 substring, u64 offset, Str8MatchOpt opt) {
+internal u64 str8_find_opt(Str8 string, Str8 substring, u64 offset, Str8MatchOpt opt) {
     u64 result = NPOS;
 
     if(substring.size > 0 && string.size >= (substring.size + offset)) {
@@ -333,7 +325,7 @@ function u64 str8_find_opt(Str8 string, Str8 substring, u64 offset, Str8MatchOpt
     return result;
 }
 
-function u64 str8_find_reverse_opt(Str8 string, Str8 substring, u64 offset, Str8MatchOpt opt) {
+internal u64 str8_find_reverse_opt(Str8 string, Str8 substring, u64 offset, Str8MatchOpt opt) {
     u64 result = NPOS;
 
     if (substring.size > 0 && string.size >= (substring.size + offset))
@@ -358,7 +350,7 @@ function u64 str8_find_reverse_opt(Str8 string, Str8 substring, u64 offset, Str8
     return result;
 }
 
-function Str8View str8_slice_opt(Str8View str, u64 pos, Str8ViewOpt opt) {
+internal Str8View str8_slice_opt(Str8View str, u64 pos, Str8ViewOpt opt) {
     pos = clamp_top(pos, str.size);
 
     if (opt.postfix) {
@@ -383,7 +375,7 @@ function Str8View str8_slice_opt(Str8View str, u64 pos, Str8ViewOpt opt) {
     return str;
 }
 
-function Str8 str8_copy(Arena* arena, Str8 str) {
+internal Str8 str8_copy(Arena* arena, Str8 str) {
     debug_assert(arena);
     Str8 string = str8_from_mem_size(arena, str.size);
 
@@ -393,7 +385,15 @@ function Str8 str8_copy(Arena* arena, Str8 str) {
     return string;
 }
 
-function Str16 str16_from_cstr(u16* str) {
+internal char* str8_copy_to_cstr(Arena *arena, Str8 str) {
+    debug_assert(arena);
+    char* string = arena_push_array(arena, char, str.size + 1);
+    mem_copy_array(string, str.data, str.size);
+    string[str.size] = 0;
+    return string;
+}
+
+internal Str16 str16_from_cstr(u16* str) {
     u64 size = 0;
     for (;str[size] != 0; size++);
 
@@ -404,7 +404,7 @@ function Str16 str16_from_cstr(u16* str) {
     return result;
 }
 
-function Str16 str16_from_mem_size(Arena* arena, u64 size) {
+internal Str16 str16_from_mem_size(Arena* arena, u64 size) {
     debug_assert(arena);
     Str16 result = { 0 };
 
@@ -419,7 +419,7 @@ const global u8 utf8_class[32] = {
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,2,2,2,2,3,3,4,5,
 };
 
-function UnicodeDecode utf8_decode(u8* str, u64 max) {
+internal UnicodeDecode utf8_decode(u8* str, u64 max) {
     UnicodeDecode result = { 1, u32_max };
     u8 byte = str[0];
     u8 byte_class = utf8_class[byte >> 3];
@@ -464,7 +464,7 @@ function UnicodeDecode utf8_decode(u8* str, u64 max) {
     return result;
 }
 
-function UnicodeDecode utf16_decode(u16* str, u64 max) {
+internal UnicodeDecode utf16_decode(u16* str, u64 max) {
     UnicodeDecode result = { 1, u32_max };
     result.codepoint = str[0];
     result.inc = 1;
@@ -475,7 +475,7 @@ function UnicodeDecode utf16_decode(u16* str, u64 max) {
     return result;
 }
 
-function u32 utf8_encode(u8* str, u32 codepoint) {
+internal u32 utf8_encode(u8* str, u32 codepoint) {
     u32 inc = 0;
     if (codepoint <= 0x7F) {
         str[0] = (u8)codepoint;
@@ -506,7 +506,7 @@ function u32 utf8_encode(u8* str, u32 codepoint) {
     return inc;
 }
 
-function u32 utf16_encode(u16* str, u32 codepoint) {
+internal u32 utf16_encode(u16* str, u32 codepoint) {
     u32 inc = 1;
     if (codepoint == u32_max)
         str[0] = (u16)'?';
@@ -521,21 +521,21 @@ function u32 utf16_encode(u16* str, u32 codepoint) {
     return inc;
 }
 
-function u32 utf8_size(u32 cp) {
+internal u32 utf8_size(u32 cp) {
     if (cp <= 0x7F)       return 1;
     if (cp <= 0x7FF)      return 2;
     if (cp <= 0xFFFF)     return 3;
     return 4;
 }
 
-function u32 utf16_size(u32 cp) {
+internal u32 utf16_size(u32 cp) {
     if (cp > 0x10FFFF) return 0;
     if (cp >= 0xD800 && cp <= 0xDFFF) return 0;
     if (cp <= 0xFFFF) return 1;
     return 2;
 }
 
-function Str8 str8_from_16(Arena* arena, Str16 str) {
+internal Str8 str8_from_16(Arena* arena, Str16 str) {
     debug_assert(arena);
     Str8 result = { 0 };
 
@@ -565,7 +565,7 @@ function Str8 str8_from_16(Arena* arena, Str16 str) {
     return result;
 }
 
-function Str16 str16_from_8(Arena* arena, Str8 str) {
+internal Str16 str16_from_8(Arena* arena, Str8 str) {
     debug_assert(arena);
     Str16 result = { 0 };
     if (!str.size) return result;
@@ -597,7 +597,7 @@ function Str16 str16_from_8(Arena* arena, Str8 str) {
     return result;
 }
 
-function Str8 str8_from_32(Arena* arena, Str32 str) {
+internal Str8 str8_from_32(Arena* arena, Str32 str) {
     debug_assert(arena);
     Str8 result = { 0 };
     if (!str.size) return result;
@@ -623,7 +623,7 @@ function Str8 str8_from_32(Arena* arena, Str32 str) {
     return result;
 }
 
-function Str32 str32_from_8(Arena* arena, Str8 str) {
+internal Str32 str32_from_8(Arena* arena, Str8 str) {
     debug_assert(arena);
     Str32 result = { 0 };
     if (!str.size) return result;
@@ -657,7 +657,7 @@ function Str32 str32_from_8(Arena* arena, Str8 str) {
 ////////////////////////////////
 // Module: Timer
 
-function Timer timer_start(void) {
+internal Timer timer_start(void) {
     Timer timer = { 0 };
     timer.ticks = clock_ticks_now();
     timer.delta = 16666.6f;
@@ -668,7 +668,7 @@ function Timer timer_start(void) {
     return timer;
 }
 
-function void timer_update(Timer* timer) {
+internal void timer_update(Timer* timer) {
     u64 current_ticks = clock_ticks_now();
 
     u64 elapsed_ticks = (current_ticks > timer->ticks) ? (current_ticks - timer->ticks) : 0;
@@ -679,14 +679,14 @@ function void timer_update(Timer* timer) {
     timer->ticks = current_ticks;
 }
 
-function u64 timer_get_timestamp(Timer* timer) {
+internal u64 timer_get_timestamp(Timer* timer) {
     return (u64)(timer->ticks * timer->inverse_ticks_per_us);
 }
 
 //////////////////////////////
 // DS: DArray
 
-function force_inline void* darray_handle(Arena* arena, DArrayHeader* header, DArrayMetaData meta, u64 index) {
+internal force_inline void* darray_handle(Arena* arena, DArrayHeader* header, DArrayMetaData meta, u64 index) {
     u8** chunks = (u8**)(header + 1);
 
     u64 i_shift = index >> meta.shift;
