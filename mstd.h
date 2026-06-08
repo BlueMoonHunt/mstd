@@ -106,7 +106,7 @@
 #if COMPILER_CLANG || COMPILER_GCC
 #define internal static __attribute__((unused))
 #elif COMPILER_MSVC
-#define internal __pragma(warning(suppress: 4505)) static
+#define internal __pragma(warning(suppress : 4505)) static
 #else
 #define internal static
 #endif
@@ -128,16 +128,15 @@
 #define JOIN_SYMBOLS(a, b) a##b
 #define JOIN(a, b) JOIN_SYMBOLS(a, b)
 
-#define scope(begin, end)                                                      \
-    for (int scope_var_i = ((begin), 0); !scope_var_i; scope_var_i += 1, (end))
+#define scope(begin, end) for (int scope_var_i = ((begin), 0); !scope_var_i; scope_var_i += 1, (end))
 
 #define bit(x) (1ULL << x)
 
 #define NPOS (u64)(-1)
 
-#define OPTIONS(T, ...)                                                        \
-    typedef struct T {                                                         \
-        __VA_ARGS__                                                            \
+#define OPTIONS(T, ...)                                                                                                \
+    typedef struct T {                                                                                                 \
+        __VA_ARGS__                                                                                                    \
     } T
 
 #define STATIC_ASSERT _Static_assert
@@ -230,10 +229,8 @@ typedef AtomicType(i64) atomic_i64;
 
 #define f32_max (*(const float *)(const unsigned int[]){0x7F7FFFFF})
 #define f32_min (*(const float *)(const unsigned int[]){0x00800000})
-#define f64_max                                                                \
-    (*(const double *)(const unsigned long long[]){0x7FEFFFFFFFFFFFFFULL})
-#define f64_min                                                                \
-    (*(const double *)(const unsigned long long[]){0x0010000000000000ULL})
+#define f64_max (*(const double *)(const unsigned long long[]){0x7FEFFFFFFFFFFFFFULL})
+#define f64_min (*(const double *)(const unsigned long long[]){0x0010000000000000ULL})
 #endif
 
 #define enum_t(enum, T) T
@@ -300,11 +297,9 @@ int memcmp(const void *buffer1, const void *buffer2, size_t count);
 #define mem_zero_struct(mem) mem_zero((mem), sizeof(*(mem)))
 #define mem_zero_array(mem, count) mem_zero((mem), sizeof(*(mem)) * (count))
 #define mem_copy_struct(dest, src) mem_copy((dest), (src), sizeof(*(dest)))
-#define mem_copy_array(dest, src, count)                                       \
-    mem_copy((dest), (src), sizeof(*(dest)) * (count))
+#define mem_copy_array(dest, src, count) mem_copy((dest), (src), sizeof(*(dest)) * (count))
 #define mem_move_struct(dest, src) mem_move((dest), (src), sizeof(*(dest)))
-#define mem_move_array(dest, src, count)                                       \
-    mem_move((dest), (src), sizeof(*(dest)) * (count))
+#define mem_move_array(dest, src, count) mem_move((dest), (src), sizeof(*(dest)) * (count))
 
 #if COMPILER_MSVC
 #define mem_align_of(T) __alignof(T)
@@ -342,29 +337,21 @@ int memcmp(const void *buffer1, const void *buffer2, size_t count);
 #define clamp_bottom(val, low) (((val) > (low)) ? (val) : (low))
 #define clamp(val, low, high) (clamp_bottom(low, clamp_top(val, high)))
 
-#define DECLARE_QUANT(TYPE)                                                    \
-    force_inline internal TYPE quantize_f32_to_##TYPE(f32 val, f32 min,        \
-                                                      f32 max);                \
-    force_inline internal f32 dequantize_##TYPE##_to_f32(TYPE val, f32 min,    \
-                                                         f32 max);
+#define DECLARE_QUANT(TYPE)                                                                                            \
+    force_inline internal TYPE quantize_f32_to_##TYPE(f32 val, f32 min, f32 max);                                      \
+    force_inline internal f32 dequantize_##TYPE##_to_f32(TYPE val, f32 min, f32 max);
 
-#define DEFINE_QUANT(TYPE)                                                     \
-    force_inline internal TYPE quantize_f32_to_##TYPE(f32 val, f32 min,        \
-                                                      f32 max) {               \
-        if (max <= min)                                                        \
-            return (TYPE)0;                                                    \
-        f32 scaled = ((val - min) / (max - min)) *                             \
-                         ((f32)TYPE##_max - (f32)TYPE##_min) +                 \
-                     (f32)TYPE##_min;                                          \
-        return (TYPE)clamp(roundf(scaled), (f32)TYPE##_min, (f32)TYPE##_max);  \
-    }                                                                          \
-    force_inline internal f32 dequantize_##TYPE##_to_f32(TYPE val, f32 min,    \
-                                                         f32 max) {            \
-        if (max <= min)                                                        \
-            return min;                                                        \
-        return ((f32)val - (f32)TYPE##_min) /                                  \
-                   ((f32)TYPE##_max - (f32)TYPE##_min) * (max - min) +         \
-               min;                                                            \
+#define DEFINE_QUANT(TYPE)                                                                                             \
+    force_inline internal TYPE quantize_f32_to_##TYPE(f32 val, f32 min, f32 max) {                                     \
+        if (max <= min)                                                                                                \
+            return (TYPE)0;                                                                                            \
+        f32 scaled = ((val - min) / (max - min)) * ((f32)TYPE##_max - (f32)TYPE##_min) + (f32)TYPE##_min;              \
+        return (TYPE)clamp(roundf(scaled), (f32)TYPE##_min, (f32)TYPE##_max);                                          \
+    }                                                                                                                  \
+    force_inline internal f32 dequantize_##TYPE##_to_f32(TYPE val, f32 min, f32 max) {                                 \
+        if (max <= min)                                                                                                \
+            return min;                                                                                                \
+        return ((f32)val - (f32)TYPE##_min) / ((f32)TYPE##_max - (f32)TYPE##_min) * (max - min) + min;                 \
     }
 
 DECLARE_QUANT(i8)
@@ -384,29 +371,28 @@ DECLARE_QUANT(u32)
 #endif
 
 #if MSTD_DEBUG
-#define debug_assert(condition)                                                \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf("ASSERT FAILED\nFILE: %s\nLINE: %d\nCONDITION: %s\n",       \
-                   __FILE__, __LINE__, #condition);                            \
-            trap();                                                            \
-        }                                                                      \
+#define debug_assert(condition)                                                                                        \
+    do {                                                                                                               \
+        if (!(condition)) {                                                                                            \
+            printf("ASSERT FAILED\nFILE: %s\nLINE: %d\nCONDITION: %s\n", __FILE__, __LINE__, #condition);              \
+            trap();                                                                                                    \
+        }                                                                                                              \
     } while (0)
 
-#define debug_assert_code(code, check)                                         \
-    do {                                                                       \
-        if ((code) != (check)) {                                               \
-            printf("CODE MISMATCH\nFILE: %s\nLINE: %d\nEXPECTED: %s\nACTUAL: " \
-                   "%s\n",                                                     \
-                   __FILE__, __LINE__, #check, #code);                         \
-            trap();                                                            \
-        }                                                                      \
+#define debug_assert_code(code, check)                                                                                 \
+    do {                                                                                                               \
+        if ((code) != (check)) {                                                                                       \
+            printf("CODE MISMATCH\nFILE: %s\nLINE: %d\nEXPECTED: %s\nACTUAL: "                                         \
+                   "%s\n",                                                                                             \
+                   __FILE__, __LINE__, #check, #code);                                                                 \
+            trap();                                                                                                    \
+        }                                                                                                              \
     } while (0)
 
-#define debug_panic()                                                          \
-    do {                                                                       \
-        printf("PANIC\nFILE: %s\nLINE: %d\n", __FILE__, __LINE__);             \
-        trap();                                                                \
+#define debug_panic()                                                                                                  \
+    do {                                                                                                               \
+        printf("PANIC\nFILE: %s\nLINE: %d\n", __FILE__, __LINE__);                                                     \
+        trap();                                                                                                        \
     } while (0)
 #else
 #define debug_assert(condition)
@@ -451,74 +437,55 @@ typedef struct Arena {
 #endif
 
 OPTIONS(ArenaOpt, u8 large_pages;);
-internal Arena *arena_alloc_opt(u64 reserve_size, char *file, u32 line,
-                                       ArenaOpt opt);
-#define arena_alloc(reserve_size, ...)                                         \
-    arena_alloc_opt(reserve_size, __FILE__, __LINE__, (ArenaOpt){__VA_ARGS__})
+internal Arena *arena_alloc_opt(u64 reserve_size, char *file, u32 line, ArenaOpt opt);
+#define arena_alloc(reserve_size, ...) arena_alloc_opt(reserve_size, __FILE__, __LINE__, (ArenaOpt){__VA_ARGS__})
 
 internal void arena_release(Arena *arena);
 internal void arena_reset(Arena *arena);
 
 internal void *arena_push(Arena *arena, u64 size, u64 align);
-#define arena_push_struct(arena, T)                                            \
-    (T *)arena_push(arena, sizeof(T), mem_align_of(T))
-#define arena_push_array(arena, T, count)                                      \
-    (T *)arena_push(arena, sizeof(T) * (count), mem_align_of(T))
+#define arena_push_struct(arena, T) (T *)arena_push(arena, sizeof(T), mem_align_of(T))
+#define arena_push_array(arena, T, count) (T *)arena_push(arena, sizeof(T) * (count), mem_align_of(T))
 
 internal void arena_temp_push(Arena *arena);
 internal void arena_temp_pop(Arena *arena);
 internal void arena_temp_pop_all(Arena *arena);
-#define arena_temp_scope(arena)                                                \
-    scope(arena_temp_push(arena), arena_temp_pop(arena))
+#define arena_temp_scope(arena) scope(arena_temp_push(arena), arena_temp_pop(arena))
 
 internal Arena *arena_scratch_alloc(void);
 internal void arena_scratch_release(Arena *arena);
-#define arena_scratch_scope(scratch)                                           \
-    for (Arena *scratch = arena_scratch_alloc(); scratch != NULL;              \
-         (arena_scratch_release(scratch), scratch = NULL))
+#define arena_scratch_scope(scratch)                                                                                   \
+    for (Arena *scratch = arena_scratch_alloc(); scratch != NULL; (arena_scratch_release(scratch), scratch = NULL))
 
 ////////////////////////////////
 // DS: LinkList
 
-#define dll_push_back_np(head, tail, node, next, prev)                         \
-    ((head) == 0 ? ((head) = (tail) = (node), (node)->next = (node)->prev = 0) \
-                 : ((node)->prev = (tail), (tail)->next = (node),              \
-                    (tail) = (node), (node)->next = 0))
+#define dll_push_back_np(head, tail, node, next, prev)                                                                 \
+    ((head) == 0 ? ((head) = (tail) = (node), (node)->next = (node)->prev = 0)                                         \
+                 : ((node)->prev = (tail), (tail)->next = (node), (tail) = (node), (node)->next = 0))
 
-#define dll_remove_np(head, tail, node, next, prev)                            \
-    ((head) == (node)                                                          \
-         ? ((head) == (tail) ? ((head) = (tail) = 0)                           \
-                             : ((head) = (head)->next, (head)->prev = 0))      \
-         : ((tail) == (node) ? ((tail) = (tail)->prev, (tail)->next = 0)       \
-                             : ((node)->next->prev = (node)->prev,             \
-                                (node)->prev->next = (node)->next)))
+#define dll_remove_np(head, tail, node, next, prev)                                                                    \
+    ((head) == (node) ? ((head) == (tail) ? ((head) = (tail) = 0) : ((head) = (head)->next, (head)->prev = 0))         \
+                      : ((tail) == (node) ? ((tail) = (tail)->prev, (tail)->next = 0)                                  \
+                                          : ((node)->next->prev = (node)->prev, (node)->prev->next = (node)->next)))
 
-#define sll_push_front_n(head, tail, node, next)                               \
-    ((node)->next = (head), ((head) == 0 ? (tail) = (node) : 0),               \
-     (head) = (node))
+#define sll_push_front_n(head, tail, node, next)                                                                       \
+    ((node)->next = (head), ((head) == 0 ? (tail) = (node) : 0), (head) = (node))
 
-#define sll_push_back_n(head, tail, node, next)                                \
-    ((node)->next = 0,                                                         \
-     ((head) == 0 ? ((head) = (node)) : ((tail)->next = (node))),              \
-     (tail) = (node))
+#define sll_push_back_n(head, tail, node, next)                                                                        \
+    ((node)->next = 0, ((head) == 0 ? ((head) = (node)) : ((tail)->next = (node))), (tail) = (node))
 
-#define sll_pop_front_n(head, tail, next)                                      \
-    ((head) == (tail) ? ((head) = (tail) = 0) : ((head) = (head)->next))
+#define sll_pop_front_n(head, tail, next) ((head) == (tail) ? ((head) = (tail) = 0) : ((head) = (head)->next))
 
-#define sll_pop_back_n(head, tail, next)                                       \
-    ((head) == (tail) ? ((head) = (tail) = 0) : ((head) = (head)->next))
+#define sll_pop_back_n(head, tail, next) ((head) == (tail) ? ((head) = (tail) = 0) : ((head) = (head)->next))
 
-#define dll_push_front_np(head, tail, node, next, prev)                        \
-    dll_push_back_np(tail, head, node, prev, next)
+#define dll_push_front_np(head, tail, node, next, prev) dll_push_back_np(tail, head, node, prev, next)
 
-#define dll_push_back(head, tail, node)                                        \
-    dll_push_back_np(head, tail, node, next, prev)
-#define dll_push_front(head, tail, node)                                       \
-    dll_push_front_np(head, tail, node, next, prev)
+#define dll_push_back(head, tail, node) dll_push_back_np(head, tail, node, next, prev)
+#define dll_push_front(head, tail, node) dll_push_front_np(head, tail, node, next, prev)
 #define dll_remove(head, tail, node) dll_remove_np(head, tail, node, next, prev)
 
-#define sll_push_front(head, tail, node)                                       \
-    sll_push_front_n(head, tail, node, next)
+#define sll_push_front(head, tail, node) sll_push_front_n(head, tail, node, next)
 #define sll_push_back(head, tail, node) sll_push_back_n(head, tail, node, next)
 #define sll_pop_front(head, tail) sll_pop_front_n(head, tail, next)
 #define sll_pop_back(head, tail) sll_pop_back_n(head, tail, next)
@@ -537,10 +504,10 @@ struct DArrayHeader {
     u64 size;
 };
 
-#define darray_tag                                                             \
-    union {                                                                    \
-        u64 size;                                                              \
-        DArrayHeader header;                                                   \
+#define darray_tag                                                                                                     \
+    union {                                                                                                            \
+        u64 size;                                                                                                      \
+        DArrayHeader header;                                                                                           \
     };
 
 typedef struct DArrayMetaData DArrayMetaData;
@@ -550,10 +517,7 @@ struct DArrayMetaData {
     u64 el_size;
 };
 
-internal force_inline void *darray_handle(Arena *arena,
-                                                 DArrayHeader *header,
-                                                 DArrayMetaData meta,
-                                                 u64 index);
+internal force_inline void *darray_handle(Arena *arena, DArrayHeader *header, DArrayMetaData meta, u64 index);
 
 ////////////////////////////////
 // Module:  String
@@ -685,11 +649,8 @@ mem_align_to(64) global const u8 ASCII_LUT[256] = {
 #define char_is_space(c) (ASCII_LUT[(u8)(c)] & CHAR_TYPE_SPACE)
 #define char_is_upper(c) (ASCII_LUT[(u8)(c)] & CHAR_TYPE_UPPER)
 #define char_is_lower(c) (ASCII_LUT[(u8)(c)] & CHAR_TYPE_LOWER)
-#define char_is_alpha(c)                                                       \
-    (ASCII_LUT[(u8)(c)] & (CHAR_TYPE_UPPER | CHAR_TYPE_LOWER))
-#define char_is_alphanumeric(c)                                                \
-    (ASCII_LUT[(u8)(c)] &                                                      \
-     (CHAR_TYPE_UPPER | CHAR_TYPE_LOWER | CHAR_TYPE_DIGIT10))
+#define char_is_alpha(c) (ASCII_LUT[(u8)(c)] & (CHAR_TYPE_UPPER | CHAR_TYPE_LOWER))
+#define char_is_alphanumeric(c) (ASCII_LUT[(u8)(c)] & (CHAR_TYPE_UPPER | CHAR_TYPE_LOWER | CHAR_TYPE_DIGIT10))
 #define char_is_numeric(c) (ASCII_LUT[(u8)(c)] & CHAR_TYPE_DIGIT10)
 #define char_is_numeric_hex(c) (ASCII_LUT[(u8)(c)] & CHAR_TYPE_DIGIT16)
 #define char_is_slash(c) (c == '/' || c == '\\')
@@ -710,7 +671,7 @@ internal u32 utf16_size(u32 cp);
 ////////////////////////////////
 // String Constructor
 
-#define str8_lit(S)                                                            \
+#define str8_lit(S)                                                                                                    \
     (Str8) { .size = sizeof(S) - 1, .data = (u8 *)S }
 #define str8(str) str8_from_cstr((u8 *)str)
 internal Str8 str8_from_cstr(u8 *str);
@@ -734,13 +695,10 @@ OPTIONS(Str8MatchOpt, u8 case_insensitive; u8 slash_insensitive;);
 internal u32 str8_match_opt(Str8 a, Str8 b, Str8MatchOpt opt);
 #define str8_match(a, b, ...) str8_match_opt(a, b, (Str8MatchOpt){__VA_ARGS__})
 #define str8_match(a, b, ...) str8_match_opt(a, b, (Str8MatchOpt){__VA_ARGS__})
-internal u64 str8_find_opt(Str8 string, Str8 substring, u64 offset,
-                                  Str8MatchOpt opt);
-#define str8_find(string, substring, offset, ...)                              \
-    str8_find_opt(string, substring, offset, (Str8MatchOpt){__VA_ARGS__})
-internal u64 str8_find_reverse_opt(Str8 string, Str8 substring,
-                                          u64 offset, Str8MatchOpt opt);
-#define str8_find_reverse(string, substring, offset, ...)                      \
+internal u64 str8_find_opt(Str8 string, Str8 substring, u64 offset, Str8MatchOpt opt);
+#define str8_find(string, substring, offset, ...) str8_find_opt(string, substring, offset, (Str8MatchOpt){__VA_ARGS__})
+internal u64 str8_find_reverse_opt(Str8 string, Str8 substring, u64 offset, Str8MatchOpt opt);
+#define str8_find_reverse(string, substring, offset, ...)                                                              \
     str8_find(string, substring, offset, (Str8MatchOpt){__VA_ARGS__})
 
 ////////////////////////////////
@@ -748,18 +706,16 @@ internal u64 str8_find_reverse_opt(Str8 string, Str8 substring,
 
 internal Str8 str8_concat(Arena *arena, Str8 a, Str8 b);
 internal Str8 str8_concat_args_till_str_npos(Arena *arena, ...);
-#define str8_concat_n(arena, ...)                                              \
-    str8_concat_args_till_str_npos(arena, __VA_ARGS__, (Str8){.size = NPOS})
+#define str8_concat_n(arena, ...) str8_concat_args_till_str_npos(arena, __VA_ARGS__, (Str8){.size = NPOS})
 
 internal Str8 str8_copy(Arena *arena, Str8 str);
-internal char* str8_copy_to_cstr(Arena *arena, Str8 str);
+internal char *str8_copy_to_cstr(Arena *arena, Str8 str);
 
 ////////////////////////////////
 // String slicing
 OPTIONS(Str8ViewOpt, Str8 delimiter; u8 postfix;);
 internal Str8View str8_slice_opt(Str8View str, u64 pos, Str8ViewOpt opt);
-#define str8_slice(str, pos, ...)                                              \
-    str8_slice_opt(str, pos, (Str8ViewOpt){__VA_ARGS__})
+#define str8_slice(str, pos, ...) str8_slice_opt(str, pos, (Str8ViewOpt){__VA_ARGS__})
 
 ////////////////////////////////
 // Module Thread
@@ -788,8 +744,7 @@ typedef void ThreadEntryPointFn(void *data);
 ////////////////////////////////
 // Threads
 
-internal void thread_attach(Thread *thread, ThreadEntryPointFn *func,
-                                   void *data);
+internal void thread_attach(Thread *thread, ThreadEntryPointFn *func, void *data);
 internal u32 thread_join(Thread *thread);
 internal void thread_detach(Thread *thread);
 internal void thread_sleep(u32 ms);
@@ -817,8 +772,7 @@ internal void rw_mutex_destroy(RWMutex *mutex);
 
 internal void cond_var_init(CondVar *var);
 internal u32 cond_var_wait(CondVar *var, Mutex *mutex);
-internal u32 cond_var_wait_rw(CondVar *var, RWMutex *mutex,
-                                     u32 write_mode);
+internal u32 cond_var_wait_rw(CondVar *var, RWMutex *mutex, u32 write_mode);
 internal void cond_var_signal(CondVar *var);
 internal void cond_var_broadcast(CondVar *var);
 internal void cond_var_destroy(CondVar *var);
@@ -829,8 +783,7 @@ internal void cond_var_destroy(CondVar *var);
 // ////////////////////////////////
 // // Semaphore
 
-internal void semaphore_init(Semaphore *semaphore, u32 initial_count,
-                                    u32 max_count);
+internal void semaphore_init(Semaphore *semaphore, u32 initial_count, u32 max_count);
 internal u32 semaphore_take(Semaphore *semaphore);
 internal void semaphore_drop(Semaphore *semaphore);
 internal void semaphore_destroy(Semaphore *semaphore);
@@ -852,18 +805,12 @@ internal void atomic_wake_all(atomic_u32 *addr);
 ////////////////////////////////
 // Module: Cmd
 
-typedef enum CmdPiority {
-    CMD_PRIORITY_NORMAL,
-    CMD_PRIORITY_IDLE,
-    CMD_PRIORITY_HIGH,
-    CMD_PRIORITY_REALTIME
-}CmdPiority;
+typedef enum CmdPiority { CMD_PRIORITY_NORMAL, CMD_PRIORITY_IDLE, CMD_PRIORITY_HIGH, CMD_PRIORITY_REALTIME } CmdPiority;
 
 internal void cmd_cli_alloc(u32 if_not_exists);
 
-OPTIONS(CmdOpt, u8 no_reset; u8 hidden; u8 inherit_handles; u8 run_ditached;
-        enum_t(CmdPiority, u8) priority;);
-internal u32 cmd_run_opt(char* command, CmdOpt opt);
+OPTIONS(CmdOpt, u8 no_reset; u8 hidden; u8 inherit_handles; u8 run_ditached; enum_t(CmdPiority, u8) priority;);
+internal u32 cmd_run_opt(char *command, CmdOpt opt);
 #define cmd_run(command, ...) cmd_run_opt(command, (CmdOpt){__VA_ARGS__})
 
 ////////////////////////////////
@@ -932,29 +879,20 @@ internal FileHandle file_open(Str8 name, FileAccessFlag flags);
 internal u64 file_size(FileHandle handle);
 internal void file_close(FileHandle handle);
 
-internal u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset,
-                                 u64 size);
+internal u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset, u64 size);
 #define file_read(arena, handle) file_read_ex(arena, handle, 0, NPOS)
-#define file_read_struct(arena, handle, T, offset)                             \
-    (T *)file_read_ex(arena, handle, sizeof(T), offset)
+#define file_read_struct(arena, handle, T, offset) (T *)file_read_ex(arena, handle, sizeof(T), offset)
 
-internal void file_write_ex(FileHandle handle, void *data, u64 offset,
-                                   u64 size);
+internal void file_write_ex(FileHandle handle, void *data, u64 offset, u64 size);
 #define file_write(handle, data) file_write(handle, data, 0, NPOS)
-#define file_write_struct(handle, struct_ptr, offset)                          \
-    file_write_ex(handle, struct_ptr, offset, sizeof(*struct_ptr))
-#define file_write_string(handle, str)                                         \
-    file_write_ex(handle, str.data, 0, str.size)
+#define file_write_struct(handle, struct_ptr, offset) file_write_ex(handle, struct_ptr, offset, sizeof(*struct_ptr))
+#define file_write_string(handle, str) file_write_ex(handle, str.data, 0, str.size)
 
 ////////////////////////////////
 // Module: File Watcher
 
-internal FileWatcher *file_watcher_create(Arena *arena, Str8 path,
-                                                 u32 watch_sub_directory);
-internal FileEvent *file_watcher_poll_events(FileWatcher *watcher,
-                                                    Arena *arena,
-                                                    u32 timeout_ms,
-                                                    u32 *out_count);
+internal FileWatcher *file_watcher_create(Arena *arena, Str8 path, u32 watch_sub_directory);
+internal FileEvent *file_watcher_poll_events(FileWatcher *watcher, Arena *arena, u32 timeout_ms, u32 *out_count);
 internal void file_watcher_destroy(FileWatcher *watcher);
 
 ////////////////////////////////

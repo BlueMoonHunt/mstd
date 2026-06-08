@@ -1,4 +1,3 @@
-#include "mstd.h"
 #define NOGDI
 #define NOUSER
 #define WIN32_LEAN_AND_MEAN
@@ -12,25 +11,17 @@
 // Module: Memory
 
 internal void *mem_reserve(u64 size, u32 large_pages) {
-    void *result =
-        (large_pages)
-            ? VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT | MEM_LARGE_PAGES,
-                           PAGE_READWRITE)
-            : VirtualAlloc(0, size, MEM_RESERVE, PAGE_READWRITE);
+    void *result = (large_pages) ? VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT | MEM_LARGE_PAGES, PAGE_READWRITE)
+                                 : VirtualAlloc(0, size, MEM_RESERVE, PAGE_READWRITE);
     return result;
 }
 
 internal u8 mem_commit(void *ptr, u64 size, u32 large_pages) {
-    u8 result =
-        (large_pages)
-            ? 1
-            : (VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE) != NULL);
+    u8 result = (large_pages) ? 1 : (VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE) != NULL);
     return result;
 }
 
-internal void mem_decommit(void *ptr, u64 size) {
-    VirtualFree(ptr, size, MEM_DECOMMIT);
-}
+internal void mem_decommit(void *ptr, u64 size) { VirtualFree(ptr, size, MEM_DECOMMIT); }
 
 internal void mem_release(void *ptr, u64 size) {
     (void)size;
@@ -63,8 +54,7 @@ internal void cmd_cli_alloc(u32 if_not_exists) {
 internal u32 cmd_run_opt(char *command, CmdOpt opt) {
     Arena *scratch = arena_scratch_alloc();
     char *prefix = "powershell -Command";
-    char *cmd_str =
-        (char *)str8_from_fmt(scratch, "%s %s", prefix, command).data;
+    char *cmd_str = (char *)str8_from_fmt(scratch, "%s %s", prefix, command).data;
 
     STARTUPINFOA si = {0};
     si.cb = sizeof(si);
@@ -82,9 +72,8 @@ internal u32 cmd_run_opt(char *command, CmdOpt opt) {
             .lpSecurityDescriptor = NULL,
             .bInheritHandle = TRUE,
         };
-        nul = CreateFileA("NUL", GENERIC_WRITE,
-                          FILE_SHARE_WRITE | FILE_SHARE_READ, &sa,
-                          OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        nul = CreateFileA("NUL", GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, &sa, OPEN_EXISTING,
+                          FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (nul != INVALID_HANDLE_VALUE) {
             si.dwFlags |= STARTF_USESTDHANDLES;
@@ -117,12 +106,10 @@ internal u32 cmd_run_opt(char *command, CmdOpt opt) {
         flags |= DETACHED_PROCESS;
     }
 
-    BOOL inherit =
-        (si.dwFlags & STARTF_USESTDHANDLES) ? TRUE : (BOOL)opt.inherit_handles;
+    BOOL inherit = (si.dwFlags & STARTF_USESTDHANDLES) ? TRUE : (BOOL)opt.inherit_handles;
 
     PROCESS_INFORMATION pi = {0};
-    BOOL ok = CreateProcessA(NULL, cmd_str, NULL, NULL, inherit, flags, NULL,
-                             NULL, &si, &pi);
+    BOOL ok = CreateProcessA(NULL, cmd_str, NULL, NULL, inherit, flags, NULL, NULL, &si, &pi);
 
     if (nul != INVALID_HANDLE_VALUE)
         CloseHandle(nul);
@@ -160,13 +147,11 @@ internal DWORD WINAPI Win32_ThreadTrampoline(LPVOID param) {
     return 0;
 }
 
-internal void thread_attach(Thread *thread, ThreadEntryPointFn *func,
-                            void *data) {
+internal void thread_attach(Thread *thread, ThreadEntryPointFn *func, void *data) {
     Win32ThreadCtx *ctx = (Win32ThreadCtx *)&thread->reserved;
     ctx->user_func = func;
     ctx->user_data = data;
-    ctx->handle =
-        CreateThread(NULL, 0, Win32_ThreadTrampoline, ctx, 0, &ctx->id);
+    ctx->handle = CreateThread(NULL, 0, Win32_ThreadTrampoline, ctx, 0, &ctx->id);
 }
 
 internal u32 thread_join(Thread *thread) {
@@ -184,13 +169,14 @@ internal void thread_detach(Thread *thread) {
 internal u32 thread_id(void) { return (u32)GetCurrentThreadId(); }
 
 internal void thread_sleep(u32 ms) {
-    if (ms == 0) { SwitchToThread(); return; }
+    if (ms == 0) {
+        SwitchToThread();
+        return;
+    }
     static HANDLE s_timer = NULL;
 
     if (!s_timer)
-        s_timer = CreateWaitableTimerExW(NULL, NULL,
-                                         CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
-                                         TIMER_ALL_ACCESS);
+        s_timer = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
     if (s_timer) {
         LARGE_INTEGER due;
         due.QuadPart = -(LONGLONG)ms * 10000;
@@ -202,28 +188,18 @@ internal void thread_sleep(u32 ms) {
 ////////////////////////////////
 // Mutex
 
-internal void mutex_init(Mutex *mutex) {
-    InitializeCriticalSection((LPCRITICAL_SECTION)mutex->reserved);
-}
+internal void mutex_init(Mutex *mutex) { InitializeCriticalSection((LPCRITICAL_SECTION)mutex->reserved); }
 
-internal void mutex_take(Mutex *mutex) {
-    EnterCriticalSection((LPCRITICAL_SECTION)mutex->reserved);
-}
+internal void mutex_take(Mutex *mutex) { EnterCriticalSection((LPCRITICAL_SECTION)mutex->reserved); }
 
-internal void mutex_drop(Mutex *mutex) {
-    LeaveCriticalSection((LPCRITICAL_SECTION)mutex->reserved);
-}
+internal void mutex_drop(Mutex *mutex) { LeaveCriticalSection((LPCRITICAL_SECTION)mutex->reserved); }
 
-internal void mutex_destroy(Mutex *mutex) {
-    DeleteCriticalSection((LPCRITICAL_SECTION)mutex->reserved);
-}
+internal void mutex_destroy(Mutex *mutex) { DeleteCriticalSection((LPCRITICAL_SECTION)mutex->reserved); }
 
 ////////////////////////////////
 // Read/Write Mutex
 
-internal void rw_mutex_init(RWMutex *mutex) {
-    InitializeSRWLock((PSRWLOCK)mutex->reserved);
-}
+internal void rw_mutex_init(RWMutex *mutex) { InitializeSRWLock((PSRWLOCK)mutex->reserved); }
 
 internal void rw_mutex_take(RWMutex *mutex, u32 write_mode) {
     if (write_mode) {
@@ -247,32 +223,24 @@ internal void rw_mutex_destroy(RWMutex *mutex) { (void)mutex; }
 ////////////////////////////////
 // Condition Variable
 
-internal void cond_var_init(CondVar *var) {
-    InitializeConditionVariable((PCONDITION_VARIABLE)var->reserved);
-}
+internal void cond_var_init(CondVar *var) { InitializeConditionVariable((PCONDITION_VARIABLE)var->reserved); }
 
 internal u32 cond_var_wait(CondVar *var, Mutex *mutex) {
     BOOL result =
-        SleepConditionVariableCS((PCONDITION_VARIABLE)var->reserved,
-                                 (PCRITICAL_SECTION)mutex->reserved, INFINITE);
+        SleepConditionVariableCS((PCONDITION_VARIABLE)var->reserved, (PCRITICAL_SECTION)mutex->reserved, INFINITE);
     return (u32)result;
 }
 
 internal u32 cond_var_wait_rw(CondVar *var, RWMutex *mutex, u32 write_mode) {
     ULONG flags = write_mode ? 0 : CONDITION_VARIABLE_LOCKMODE_SHARED;
     BOOL result =
-        SleepConditionVariableSRW((PCONDITION_VARIABLE)var->reserved,
-                                  (PSRWLOCK)mutex->reserved, INFINITE, flags);
+        SleepConditionVariableSRW((PCONDITION_VARIABLE)var->reserved, (PSRWLOCK)mutex->reserved, INFINITE, flags);
     return (u32)result;
 }
 
-internal void cond_var_signal(CondVar *var) {
-    WakeConditionVariable((PCONDITION_VARIABLE)var->reserved);
-}
+internal void cond_var_signal(CondVar *var) { WakeConditionVariable((PCONDITION_VARIABLE)var->reserved); }
 
-internal void cond_var_broadcast(CondVar *var) {
-    WakeAllConditionVariable((PCONDITION_VARIABLE)var->reserved);
-}
+internal void cond_var_broadcast(CondVar *var) { WakeAllConditionVariable((PCONDITION_VARIABLE)var->reserved); }
 
 // CONDITION_VARIABLE does not require explicit destruction on Windows.
 internal void cond_var_destroy(CondVar *var) { (void)var; }
@@ -280,10 +248,8 @@ internal void cond_var_destroy(CondVar *var) { (void)var; }
 ////////////////////////////////
 // Semaphore
 
-internal void semaphore_init(Semaphore *semaphore, u32 initial_count,
-                             u32 max_count) {
-    HANDLE handle =
-        CreateSemaphoreW(NULL, (LONG)initial_count, (LONG)max_count, NULL);
+internal void semaphore_init(Semaphore *semaphore, u32 initial_count, u32 max_count) {
+    HANDLE handle = CreateSemaphoreW(NULL, (LONG)initial_count, (LONG)max_count, NULL);
     *((HANDLE *)semaphore->reserved) = handle;
 }
 
@@ -307,13 +273,11 @@ internal void semaphore_destroy(Semaphore *semaphore) {
 // Barriers
 
 internal void barrier_init(Barrier *barrier, u32 count) {
-    InitializeSynchronizationBarrier(
-        (LPSYNCHRONIZATION_BARRIER)barrier->reserved, (LONG)count, -1);
+    InitializeSynchronizationBarrier((LPSYNCHRONIZATION_BARRIER)barrier->reserved, (LONG)count, -1);
 }
 
 internal void barrier_wait(Barrier *barrier) {
-    EnterSynchronizationBarrier((LPSYNCHRONIZATION_BARRIER)barrier->reserved,
-                                0);
+    EnterSynchronizationBarrier((LPSYNCHRONIZATION_BARRIER)barrier->reserved, 0);
 }
 
 internal void barrier_destroy(Barrier *barrier) {
@@ -324,17 +288,12 @@ internal void barrier_destroy(Barrier *barrier) {
 // Hardware Atomics wait-on-address
 
 internal void atomic_wait_u32(atomic_u32 *addr, u32 expected_value) {
-    WaitOnAddress((volatile PVOID)addr, (PVOID)&expected_value, sizeof(u32),
-                  INFINITE);
+    WaitOnAddress((volatile PVOID)addr, (PVOID)&expected_value, sizeof(u32), INFINITE);
 }
 
-internal void atomic_wake_single(atomic_u32 *addr) {
-    WakeByAddressSingle((PVOID)addr);
-}
+internal void atomic_wake_single(atomic_u32 *addr) { WakeByAddressSingle((PVOID)addr); }
 
-internal void atomic_wake_all(atomic_u32 *addr) {
-    WakeByAddressAll((PVOID)addr);
-}
+internal void atomic_wake_all(atomic_u32 *addr) { WakeByAddressAll((PVOID)addr); }
 
 ////////////////////////////////
 // Module: File
@@ -362,13 +321,11 @@ internal u32 file_copy(Str8 src, Str8 dest) {
     int sleep_ms = 1;
 
     for (int i = 0; i < max_retries; i++) {
-        if (CopyFileExA((char *)src.data, (char *)dest.data, NULL, NULL, FALSE,
-                        0))
+        if (CopyFileExA((char *)src.data, (char *)dest.data, NULL, NULL, FALSE, 0))
             return 1;
 
         DWORD err = GetLastError();
-        if (err == ERROR_SHARING_VIOLATION || err == ERROR_ACCESS_DENIED ||
-            err == ERROR_LOCK_VIOLATION) {
+        if (err == ERROR_SHARING_VIOLATION || err == ERROR_ACCESS_DENIED || err == ERROR_LOCK_VIOLATION) {
             thread_sleep(sleep_ms);
             sleep_ms *= 2;
         } else
@@ -384,8 +341,7 @@ internal u32 file_move(Str8 src, Str8 dest) {
 
     for (int i = 0; i < max_retries; i++) {
         if (MoveFileExA((char *)src.data, (char *)dest.data,
-                        MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED |
-                            MOVEFILE_WRITE_THROUGH)) {
+                        MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH)) {
             return 1;
         }
 
@@ -401,15 +357,13 @@ internal u32 file_move(Str8 src, Str8 dest) {
 
 internal u32 file_exists(Str8 path) {
     DWORD attributes = GetFileAttributesA((char *)path.data);
-    u32 exists = (attributes != INVALID_FILE_ATTRIBUTES) &&
-                 !!(~attributes & FILE_ATTRIBUTE_DIRECTORY);
+    u32 exists = (attributes != INVALID_FILE_ATTRIBUTES) && !!(~attributes & FILE_ATTRIBUTE_DIRECTORY);
     return exists;
 }
 
 internal u32 file_directory_exists(Str8 path) {
     DWORD attributes = GetFileAttributesA((char *)path.data);
-    u32 exists = (attributes != INVALID_FILE_ATTRIBUTES) &&
-                 (attributes & FILE_ATTRIBUTE_DIRECTORY);
+    u32 exists = (attributes != INVALID_FILE_ATTRIBUTES) && (attributes & FILE_ATTRIBUTE_DIRECTORY);
     return exists;
 }
 
@@ -443,9 +397,8 @@ internal FileHandle file_open(Str8 name, FileAccessFlag flags) {
         creation_disposition = OPEN_ALWAYS;
     }
 
-    HANDLE file =
-        CreateFileW((WCHAR *)path_w32.data, access_flags, share_mode, 0,
-                    creation_disposition, FILE_ATTRIBUTE_NORMAL, 0);
+    HANDLE file = CreateFileW((WCHAR *)path_w32.data, access_flags, share_mode, 0, creation_disposition,
+                              FILE_ATTRIBUTE_NORMAL, 0);
     if (file != INVALID_HANDLE_VALUE)
         result.val[0] = (u64)file;
     arena_scratch_release(arena);
@@ -460,12 +413,9 @@ internal u64 file_size(FileHandle handle) {
     return size;
 }
 
-internal void file_close(FileHandle handle) {
-    CloseHandle((HANDLE)handle.val[0]);
-}
+internal void file_close(FileHandle handle) { CloseHandle((HANDLE)handle.val[0]); }
 
-internal u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset,
-                          u64 size) {
+internal u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset, u64 size) {
     u64 total_read_size = 0;
 
     if (handle.val[0]) {
@@ -485,8 +435,7 @@ internal u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset,
             overlapped.Offset = (DWORD)(_offset & u32_max);
             overlapped.OffsetHigh = (DWORD)(_offset >> 32);
 
-            if (ReadFile(file, (u8 *)out + total_read_size, to_read,
-                         &actual_read, &overlapped)) {
+            if (ReadFile(file, (u8 *)out + total_read_size, to_read, &actual_read, &overlapped)) {
                 _offset += actual_read;
                 total_read_size += actual_read;
                 if (actual_read < to_read)
@@ -500,8 +449,7 @@ internal u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset,
     return 0;
 }
 
-internal void file_write_ex(FileHandle handle, void *data, u64 offset,
-                            u64 size) {
+internal void file_write_ex(FileHandle handle, void *data, u64 offset, u64 size) {
     u64 total_written = 0;
 
     if (handle.val[0]) {
@@ -518,8 +466,7 @@ internal void file_write_ex(FileHandle handle, void *data, u64 offset,
             overlapped.Offset = (DWORD)(dest_offset & 0xFFFFFFFF);
             overlapped.OffsetHigh = (DWORD)(dest_offset >> 32);
 
-            if (!WriteFile((HANDLE)handle.val[0], (u8 *)data + total_written,
-                           to_write, &actual_write, &overlapped))
+            if (!WriteFile((HANDLE)handle.val[0], (u8 *)data + total_written, to_write, &actual_write, &overlapped))
                 break;
             total_written += actual_write;
             dest_offset += actual_write;
@@ -541,14 +488,13 @@ struct Win32FileWatcher {
     u32 scan_sub_directories;
 };
 
-internal FileWatcher* file_watcher_create(Arena* arena, Str8 path, u32 watch_sub_directory) {
+internal FileWatcher *file_watcher_create(Arena *arena, Str8 path, u32 watch_sub_directory) {
     Arena *scratch = arena_scratch_alloc();
     Str16 u16_path = str16_from_8(scratch, path);
 
-    HANDLE dir = CreateFileW(
-        (LPCWSTR)u16_path.data, FILE_LIST_DIRECTORY,
-        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
-        OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
+    HANDLE dir =
+        CreateFileW((LPCWSTR)u16_path.data, FILE_LIST_DIRECTORY, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
 
     struct Win32FileWatcher watcher = {0};
 
@@ -559,19 +505,16 @@ internal FileWatcher* file_watcher_create(Arena* arena, Str8 path, u32 watch_sub
     watcher.dir_handle = dir;
     watcher.iocp = CreateIoCompletionPort(watcher.dir_handle, NULL, 0, 1);
 
-    ReadDirectoryChangesW(
-        watcher.dir_handle, watcher.notification_buffer,
-        sizeof(watcher.notification_buffer), watcher.scan_sub_directories,
-        FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME, NULL,
-        &watcher.overlapped, NULL);
+    ReadDirectoryChangesW(watcher.dir_handle, watcher.notification_buffer, sizeof(watcher.notification_buffer),
+                          watcher.scan_sub_directories, FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME,
+                          NULL, &watcher.overlapped, NULL);
 
     arena_scratch_release(scratch);
-    FileWatcher* result = (FileWatcher*) arena_push_struct(arena, struct Win32FileWatcher);
+    FileWatcher *result = (FileWatcher *)arena_push_struct(arena, struct Win32FileWatcher);
     return (result);
 }
 
-internal FileEvent *file_watcher_poll_events(FileWatcher *watcher, Arena *arena,
-                                             u32 timeout_ms, u32 *out_count) {
+internal FileEvent *file_watcher_poll_events(FileWatcher *watcher, Arena *arena, u32 timeout_ms, u32 *out_count) {
     DWORD bytes = 0;
     ULONG_PTR key = 0;
     LPOVERLAPPED p_overlapped = NULL;
@@ -579,18 +522,15 @@ internal FileEvent *file_watcher_poll_events(FileWatcher *watcher, Arena *arena,
     FileEvent *result_array = NULL;
     u32 count = 0;
 
-    if (GetQueuedCompletionStatus(watcher->iocp, &bytes, &key, &p_overlapped,
-                                  (DWORD)timeout_ms)) {
+    if (GetQueuedCompletionStatus(watcher->iocp, &bytes, &key, &p_overlapped, (DWORD)timeout_ms)) {
         if (p_overlapped == &watcher->overlapped && bytes > 0) {
 
-            FILE_NOTIFY_INFORMATION *notify =
-                (FILE_NOTIFY_INFORMATION *)watcher->notification_buffer;
+            FILE_NOTIFY_INFORMATION *notify = (FILE_NOTIFY_INFORMATION *)watcher->notification_buffer;
             for (;;) {
                 count++;
                 if (notify->NextEntryOffset == 0)
                     break;
-                notify = (FILE_NOTIFY_INFORMATION *)((u8 *)notify +
-                                                     notify->NextEntryOffset);
+                notify = (FILE_NOTIFY_INFORMATION *)((u8 *)notify + notify->NextEntryOffset);
             }
 
             result_array = arena_push_array(arena, FileEvent, count);
@@ -623,18 +563,16 @@ internal FileEvent *file_watcher_poll_events(FileWatcher *watcher, Arena *arena,
 
                 if (notify->NextEntryOffset == 0)
                     break;
-                notify = (FILE_NOTIFY_INFORMATION *)((u8 *)notify +
-                                                     notify->NextEntryOffset);
+                notify = (FILE_NOTIFY_INFORMATION *)((u8 *)notify + notify->NextEntryOffset);
             }
         }
 
         mem_zero_struct(&watcher->overlapped);
-        ReadDirectoryChangesW(
-            watcher->dir_handle, watcher->notification_buffer,
-            sizeof(watcher->notification_buffer), watcher->scan_sub_directories,
-            FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME |
-                FILE_NOTIFY_CHANGE_DIR_NAME,
-            NULL, &watcher->overlapped, NULL);
+        ReadDirectoryChangesW(watcher->dir_handle, watcher->notification_buffer, sizeof(watcher->notification_buffer),
+                              watcher->scan_sub_directories,
+                              FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME |
+                                  FILE_NOTIFY_CHANGE_DIR_NAME,
+                              NULL, &watcher->overlapped, NULL);
     }
 
     *out_count = count;
@@ -676,9 +614,7 @@ internal LibHandle lib_load(Str8 name) {
     return handle;
 }
 
-internal void lib_unload(LibHandle handle) {
-    FreeLibrary((HMODULE)handle.val[0]);
-}
+internal void lib_unload(LibHandle handle) { FreeLibrary((HMODULE)handle.val[0]); }
 
 internal void *lib_get_symbol(LibHandle lib, Str8 name) {
     return (void *)GetProcAddress((HMODULE)lib.val[0], (LPCSTR)name.data);
