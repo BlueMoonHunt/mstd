@@ -703,7 +703,7 @@ internal force_inline void *darray_handle(Arena *arena, DArrayHeader *header, DA
     u64 i_shift = index >> meta.shift;
     i8 chunks_i = u64_msb(i_shift + 1);
 
-    if (arena && chunks_i < meta.chunks_n) {
+    if (arena && chunks_i < meta.chunks_max) {
         for (i8 i = 0; i <= chunks_i; ++i) {
             if (chunks[i] == 0) {
                 u64 tier_size = 1ULL << clamp_top((i + meta.shift), 63);

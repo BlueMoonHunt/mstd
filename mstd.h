@@ -111,13 +111,7 @@
 #define internal static
 #endif
 
-#define expose __declspec(dllexport) __stdcall
-
-#if MSTD_DLL
-#define export expose
-#else
-#define export
-#endif
+#define export __declspec(dllexport) __stdcall
 
 ////////////////////////////////
 // Utils
@@ -513,8 +507,8 @@ struct DArrayHeader {
 typedef struct DArrayMetaData DArrayMetaData;
 struct DArrayMetaData {
     u8 shift;
-    u8 chunks_n;
-    u64 el_size;
+    u8 chunks_max;
+    u32 el_size;
 };
 
 internal force_inline void *darray_handle(Arena *arena, DArrayHeader *header, DArrayMetaData meta, u64 index);
