@@ -51,10 +51,9 @@ internal void cmd_cli_alloc(u32 if_not_exists) {
     }
 }
 
-internal u32 cmd_run_opt(char *command, CmdOpt opt) {
-    Arena *scratch = arena_scratch_alloc();
-    char *prefix = "powershell -Command";
-    char *cmd_str = (char *)str8_from_fmt(scratch, "%s %s", prefix, command).data;
+internal u32 cmd_opt(char* command, CmdOpt opt) {
+    Arena* arena = arena_scratch_alloc();
+    Str8 cmd_str = str8_concat(arena, str8("powershell -Command "), str8(command));
 
     STARTUPINFOA si = {0};
     si.cb = sizeof(si);
@@ -109,22 +108,22 @@ internal u32 cmd_run_opt(char *command, CmdOpt opt) {
     BOOL inherit = (si.dwFlags & STARTF_USESTDHANDLES) ? TRUE : (BOOL)opt.inherit_handles;
 
     PROCESS_INFORMATION pi = {0};
-    BOOL ok = CreateProcessA(NULL, cmd_str, NULL, NULL, inherit, flags, NULL, NULL, &si, &pi);
+    BOOL ok = CreateProcessA(NULL, (char *)cmd_str.data, NULL, NULL, inherit, flags, NULL, NULL, &si, &pi);
 
     if (nul != INVALID_HANDLE_VALUE)
         CloseHandle(nul);
 
     u32 result = 1;
 
-    if (!ok)
-        result = 0;
-
     if (!opt.run_ditached)
         WaitForSingleObject(pi.hProcess, INFINITE);
 
+    DWORD code = 0;
+    if(!ok || (GetExitCodeProcess(pi.hProcess, &code) && code != 0))
+        result = 0;
+
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
-    arena_scratch_release(scratch);
 
     return result;
 }
@@ -424,7 +423,7 @@ internal u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset, u64 size)
         GetFileSizeEx(file, (LARGE_INTEGER *)&_size);
 
         u64 total_to_read = clamp_top(size, _size);
-        u8 *out = arena_push_array(arena, u8, total_to_read);
+        u8 *out = arena_push_array(arena, u8, total_to_read + 1);
 
         for (u64 _offset = offset; total_read_size < total_to_read;) {
             u64 remaining = total_to_read - total_read_size;
@@ -443,6 +442,7 @@ internal u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset, u64 size)
             } else
                 break;
         }
+        out[total_read_size] = 0;
         return out;
     }
 

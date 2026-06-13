@@ -225,6 +225,7 @@ internal Str8 str8_from_fmt(Arena *arena, char *fmt, ...) {
     if (length) {
         result = str8_from_mem_size(arena, length);
         vsnprintf((char *)result.data, result.size + 1, fmt, args);
+        result.data[result.size] = 0;
     }
 
     va_end(args);

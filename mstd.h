@@ -322,10 +322,10 @@ int memcmp(const void *buffer1, const void *buffer2, size_t count);
 #define align_up_pow2(x, p) (((x) + ((p) - 1)) & ~((p) - 1))
 #define align_down_pow2(x, p) ((x) & ~((p) - 1))
 
-#define KB(x) ((x) << 10)
-#define MB(x) ((x) << 20)
-#define GB(x) ((x) << 30)
-#define TB(x) ((x) << 40)
+#define KB(x) (u64)(x) << 10
+#define MB(x) (u64)(x) << 20
+#define GB(x) (u64)(x) << 30
+#define TB(x) (u64)(x) << 40
 
 #define clamp_top(val, high) (((val) < (high)) ? (val) : (high))
 #define clamp_bottom(val, low) (((val) > (low)) ? (val) : (low))
@@ -665,9 +665,14 @@ internal u32 utf16_size(u32 cp);
 ////////////////////////////////
 // String Constructor
 
-#define str8_lit(S)                                                                                                    \
-    (Str8) { .size = sizeof(S) - 1, .data = (u8 *)S }
-#define str8(str) str8_from_cstr((u8 *)str)
+#define str8(S)                                                                                                        \
+    _Generic((S),                                                                                                      \
+        char *: str8_from_cstr((u8 *)(S)),                                                                             \
+        const char *: str8_from_cstr((u8 *)(S)),                                                                       \
+        u8 *: str8_from_cstr((u8 *)(S)),                                                                               \
+        const u8 *: str8_from_cstr((u8 *)(S)),                                                                         \
+        default: (Str8){.size = sizeof(S) - 1, .data = (u8 *)(S)})
+
 internal Str8 str8_from_cstr(u8 *str);
 internal Str8 str8_from_fmt(Arena *arena, char *fmt, ...);
 internal Str8 str8_from_16(Arena *arena, Str16 str);
@@ -797,15 +802,15 @@ internal void atomic_wake_single(atomic_u32 *addr);
 internal void atomic_wake_all(atomic_u32 *addr);
 
 ////////////////////////////////
-// Module: Cmd
+// Module: CMD
 
 typedef enum CmdPiority { CMD_PRIORITY_NORMAL, CMD_PRIORITY_IDLE, CMD_PRIORITY_HIGH, CMD_PRIORITY_REALTIME } CmdPiority;
 
 internal void cmd_cli_alloc(u32 if_not_exists);
 
 OPTIONS(CmdOpt, u8 no_reset; u8 hidden; u8 inherit_handles; u8 run_ditached; enum_t(CmdPiority, u8) priority;);
-internal u32 cmd_run_opt(char *command, CmdOpt opt);
-#define cmd_run(command, ...) cmd_run_opt(command, (CmdOpt){__VA_ARGS__})
+internal u32 cmd_opt(char* command, CmdOpt opt);
+#define cmd(command, ...) cmd_opt(command, (CmdOpt){__VA_ARGS__})
 
 ////////////////////////////////
 // Module: Clock
@@ -878,7 +883,7 @@ internal u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset, u64 size)
 #define file_read_struct(arena, handle, T, offset) (T *)file_read_ex(arena, handle, sizeof(T), offset)
 
 internal void file_write_ex(FileHandle handle, void *data, u64 offset, u64 size);
-#define file_write(handle, data) file_write(handle, data, 0, NPOS)
+#define file_write(handle, data) file_write_ex(handle, data, 0, NPOS)
 #define file_write_struct(handle, struct_ptr, offset) file_write_ex(handle, struct_ptr, offset, sizeof(*struct_ptr))
 #define file_write_string(handle, str) file_write_ex(handle, str.data, 0, str.size)
 
