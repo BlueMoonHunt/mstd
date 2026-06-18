@@ -270,6 +270,11 @@ typedef struct Handle {
 ////////////////////////////////
 // Module: Memory
 
+typedef struct MemSlice {
+    u8* data;
+    u64 size;
+}MemSlice;
+
 #if COMPILER_MSVC
 void *memmove(void *dest, const void *src, size_t count);
 int memcmp(const void *buffer1, const void *buffer2, size_t count);
@@ -290,7 +295,7 @@ int memcmp(const void *buffer1, const void *buffer2, size_t count);
 #define mem_zero(mem, size) mem_set((mem), 0, (size))
 #define mem_zero_struct(mem) mem_zero((mem), sizeof(*(mem)))
 #define mem_zero_array(mem, count) mem_zero((mem), sizeof(*(mem)) * (count))
-#define mem_copy_struct(dest, src) mem_copy((dest), (src), sizeof(*(dest)))
+#define mem_copy_type(dest, src) mem_copy((dest), (src), sizeof(*(dest)))
 #define mem_copy_array(dest, src, count) mem_copy((dest), (src), sizeof(*(dest)) * (count))
 #define mem_move_struct(dest, src) mem_move((dest), (src), sizeof(*(dest)))
 #define mem_move_array(dest, src, count) mem_move((dest), (src), sizeof(*(dest)) * (count))
@@ -516,10 +521,7 @@ internal force_inline void *darray_handle(Arena *arena, DArrayHeader *header, DA
 ////////////////////////////////
 // Module:  String
 
-typedef struct Str8 {
-    u8 *data;
-    u64 size;
-} Str8;
+typedef MemSlice Str8;
 
 // An alias for Str8 used explicitly to denote a borrowed view of a string.
 // * Semantically, a `Str8View` indicates that the underlying memory is owned by
@@ -698,7 +700,7 @@ internal u64 str8_find_opt(Str8 string, Str8 substring, u64 offset, Str8MatchOpt
 #define str8_find(string, substring, offset, ...) str8_find_opt(string, substring, offset, (Str8MatchOpt){__VA_ARGS__})
 internal u64 str8_find_reverse_opt(Str8 string, Str8 substring, u64 offset, Str8MatchOpt opt);
 #define str8_find_reverse(string, substring, offset, ...)                                                              \
-    str8_find(string, substring, offset, (Str8MatchOpt){__VA_ARGS__})
+    str8_find_opt(string, substring, offset, (Str8MatchOpt){__VA_ARGS__})
 
 ////////////////////////////////
 // String concatinate and copy
@@ -715,6 +717,9 @@ internal char *str8_copy_to_cstr(Arena *arena, Str8 str);
 OPTIONS(Str8ViewOpt, Str8 delimiter; u8 postfix;);
 internal Str8View str8_slice_opt(Str8View str, u64 pos, Str8ViewOpt opt);
 #define str8_slice(str, pos, ...) str8_slice_opt(str, pos, (Str8ViewOpt){__VA_ARGS__})
+
+////////////////////////////////
+// String Int conversions
 
 ////////////////////////////////
 // Module Thread
@@ -834,8 +839,6 @@ internal u64 timer_get_timestamp(Timer *timer);
 ////////////////////////////////
 // Module: File
 
-typedef Handle FileHandle;
-
 typedef enum FileAccessFlag {
     FILE_ACCESS_FLAG_OPEN_EXISTING = 1 << 0,
     FILE_ACCESS_FLAG_OPEN_ALWAYS = 1 << 1,
@@ -874,15 +877,15 @@ internal u32 file_move(Str8 src, Str8 dest);
 internal u32 file_exists(Str8 path);
 internal u32 file_directory_exists(Str8 path);
 
-internal FileHandle file_open(Str8 name, FileAccessFlag flags);
-internal u64 file_size(FileHandle handle);
-internal void file_close(FileHandle handle);
+internal Handle file_open(Str8 name, FileAccessFlag flags);
+internal u64 file_size(Handle handle);
+internal void file_close(Handle handle);
 
-internal u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset, u64 size);
+internal MemSlice file_read_ex(Arena *arena, Handle handle, u64 offset, u64 size);
 #define file_read(arena, handle) file_read_ex(arena, handle, 0, NPOS)
 #define file_read_struct(arena, handle, T, offset) (T *)file_read_ex(arena, handle, sizeof(T), offset)
 
-internal void file_write_ex(FileHandle handle, void *data, u64 offset, u64 size);
+internal void file_write_ex(Handle handle, void *data, u64 offset, u64 size);
 #define file_write(handle, data) file_write_ex(handle, data, 0, NPOS)
 #define file_write_struct(handle, struct_ptr, offset) file_write_ex(handle, struct_ptr, offset, sizeof(*struct_ptr))
 #define file_write_string(handle, str) file_write_ex(handle, str.data, 0, str.size)

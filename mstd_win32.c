@@ -366,8 +366,8 @@ internal u32 file_directory_exists(Str8 path) {
     return exists;
 }
 
-internal FileHandle file_open(Str8 name, FileAccessFlag flags) {
-    FileHandle result = {0};
+internal Handle file_open(Str8 name, FileAccessFlag flags) {
+    Handle result = {0};
     Arena *arena = arena_scratch_alloc();
     Str16 path_w32 = str16_from_8(arena, name);
     DWORD access_flags = 0;
@@ -406,15 +406,15 @@ internal FileHandle file_open(Str8 name, FileAccessFlag flags) {
     return result;
 }
 
-internal u64 file_size(FileHandle handle) {
+internal u64 file_size(Handle handle) {
     u64 size = 0;
     GetFileSizeEx((HANDLE)handle.val[0], (LARGE_INTEGER *)&size);
     return size;
 }
 
-internal void file_close(FileHandle handle) { CloseHandle((HANDLE)handle.val[0]); }
+internal void file_close(Handle handle) { CloseHandle((HANDLE)handle.val[0]); }
 
-internal u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset, u64 size) {
+internal MemSlice file_read_ex(Arena *arena, Handle handle, u64 offset, u64 size) {
     u64 total_read_size = 0;
 
     if (handle.val[0]) {
@@ -443,13 +443,13 @@ internal u8 *file_read_ex(Arena *arena, FileHandle handle, u64 offset, u64 size)
                 break;
         }
         out[total_read_size] = 0;
-        return out;
+        return (MemSlice){.size = total_read_size, .buffer = out};
     }
 
-    return 0;
+    return (MemSlice){0};
 }
 
-internal void file_write_ex(FileHandle handle, void *data, u64 offset, u64 size) {
+internal void file_write_ex(Handle handle, void *data, u64 offset, u64 size) {
     u64 total_written = 0;
 
     if (handle.val[0]) {
