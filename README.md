@@ -33,7 +33,8 @@ mstd  provides:
 #include "mstd.h"
 
 int main() {
-    Arena* arena = arena_alloc(MB(1));
+    os_state_init();
+    Arena* arena = arena_alloc();
     int* numbers = arena_push_array(arena, int, 10);
 
     for (int i = 0; i < 10; i++)
@@ -50,7 +51,8 @@ int main() {
 #include "mstd.h"
 
 int main() {
-    Arena* arena = arena_alloc(MB(1));
+    os_state_init();
+    Arena* arena = arena_alloc(.reserve_size = MB(1));
     Str8 hello = str8_from_cstr("Hello, ");
     Str8 world = str8_from_cstr("world!");
     Str8 greeting = str8_concat(arena, hello, world);
