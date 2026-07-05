@@ -5,6 +5,9 @@ internal Arena* arena_alloc_(ArenaAllocOpt opt) {
     U64 page_size;
     void* memory;
 
+    if (!os_state.system_info.page_size || !os_state.system_info.large_page_size)
+        os_state_init();
+
     page_size = (opt.large_pages) ? os_get_system_info()->large_page_size : os_get_system_info()->page_size;
 
     opt.reserve_size = (opt.reserve_size) ? align_up_pow2(opt.reserve_size, page_size) : ARENA_DEFAULT_RESERVE_SIZE;

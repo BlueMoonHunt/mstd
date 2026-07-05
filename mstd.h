@@ -413,13 +413,13 @@ typedef struct Arena {
 #define ARENA_DEFAULT_SCRATCH_COUNT 4
 #endif
 
-OPTIONS(ArenaAllocOpt, U8 large_pages; U64 reserve_size; U64 commit_size;);
+OPTIONS(ArenaAllocOpt, U64 reserve_size; U64 commit_size; U8 large_pages;);
 internal Arena* arena_alloc_(ArenaAllocOpt opt);
 internal void* arena_push(Arena* arena, U64 size, U64 alignment);
 internal void arena_release(Arena* arena);
 internal void arena_reset(Arena* arena);
 
-#define arena_alloc(...) arena_alloc_((ArenaAllocOpt){0, __VA_ARGS__})
+#define arena_alloc(...) arena_alloc_((ArenaAllocOpt){.no_opt = 0, __VA_ARGS__})
 #define arena_push_type(arena, T) arena_push(arena, sizeof(T), align_of(T))
 #define arena_push_array(arena, T, count) arena_push(arena, sizeof(T) * count, align_of(T))
 
@@ -432,7 +432,7 @@ internal void arena_temp_end_all(Arena* arena);
 internal Arena* arena_scratch_begin_(ArenaAllocOpt opt);
 internal void arena_scratch_end(Arena* scratch_arena);
 
-#define arena_scratch_begin(...) arena_scratch_begin_((ArenaAllocOpt){0, __VA_ARGS__})
+#define arena_scratch_begin(...) arena_scratch_begin_((ArenaAllocOpt){.no_opt = 0, __VA_ARGS__})
 #define arena_scratch_scope(arena) for (Arena* arena = arena_scratch_begin(); arena; arena_scratch_end(arena), arena = 0)
 
 typedef struct UnicodeDecode {
@@ -583,9 +583,9 @@ internal U32 str8_match_(Str8 a, Str8 b, Str8MatchOpt opt);
 internal U64 str8_find_(Str8 string, Str8 substring, U64 offset, Str8MatchOpt opt);
 internal U64 str8_find_reverse_(Str8 string, Str8 substring, U64 offset, Str8MatchOpt opt);
 
-#define str8_match(a, b, ...) str8_match_(a, b, (Str8MatchOpt){0, __VA_ARGS__})
-#define str8_find(string, substring, offset, ...) str8_find_(string, substring, offset, (Str8MatchOpt){0, __VA_ARGS__})
-#define str8_find_reverse(string, substring, offset, ...) str8_find_(string, substring, offset, (Str8MatchOpt){0, __VA_ARGS__})
+#define str8_match(a, b, ...) str8_match_(a, b, (Str8MatchOpt){h})
+#define str8_find(string, substring, offset, ...) str8_find_(string, substring, offset, (Str8MatchOpt){.no_opt = 0, __VA_ARGS__})
+#define str8_find_reverse(string, substring, offset, ...) str8_find_(string, substring, offset, (Str8MatchOpt){.no_opt = 0, __VA_ARGS__})
 
 /* String concatinate and copy */
 internal Str8 str8_concat(Arena* arena, Str8 a, Str8 b);
@@ -600,7 +600,7 @@ internal char* str8_copy_to_cstr(Arena* arena, Str8 str);
 OPTIONS(Str8SliceOpt, Str8 delimiter; U8 postfix;);
 internal Str8Slice str8_slice_(Str8Slice str, U64 pos, Str8SliceOpt opt);
 
-#define str8_slice(str, pos, ...) str8_slice_((Str8Slice)(str), (pos), (Str8SliceOpt){0, __VA_ARGS__})
+#define str8_slice(str, pos, ...) str8_slice_((Str8Slice)(str), (pos), (Str8SliceOpt){.no_opt = 0, __VA_ARGS__})
 
 typedef struct Str16 {
     U16* data;
@@ -848,7 +848,7 @@ OPTIONS(CmdOpt,
 
 internal U32 os_cmd_opt(char* command, CmdOpt opt);
 
-#define cmd(command, ...) os_cmd_opt(command, (CmdOpt){__VA_ARGS__})
+#define cmd(command, ...) os_cmd_opt(command, (CmdOpt){.no_opt = 0, __VA_ARGS__})
 
 /* Timer */
 
