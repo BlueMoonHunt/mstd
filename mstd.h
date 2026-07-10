@@ -902,7 +902,6 @@ internal force_inline void* darray_handle(Arena* arena, DArrayHeader* header, DA
     ((node)->next = 0, ((head) == 0 ? ((head) = (node)) : ((tail)->next = (node))), (tail) = (node))
 
 #define sll_pop_front_n(head, tail, next) ((head) == (tail) ? ((head) = (tail) = 0) : ((head) = (head)->next))
-#define sll_pop_back_n(head, tail, next) ((head) == (tail) ? ((head) = (tail) = 0) : ((head) = (head)->next))
 
 #define dll_push_front_np(head, tail, node, next, prev) dll_push_back_np(tail, head, node, prev, next)
 
@@ -913,7 +912,6 @@ internal force_inline void* darray_handle(Arena* arena, DArrayHeader* header, DA
 #define sll_push_front(head, tail, node) sll_push_front_n(head, tail, node, next)
 #define sll_push_back(head, tail, node) sll_push_back_n(head, tail, node, next)
 #define sll_pop_front(head, tail) sll_pop_front_n(head, tail, next)
-#define sll_pop_back(head, tail) sll_pop_back_n(head, tail, next)
 #define sll_stack_push(head, tail, node) sll_push_front(head, tail, node)
 #define sll_stack_pop(head, tail) sll_pop_front(head, tail)
 #define sll_queue_push(head, tail, node) sll_push_back(head, tail, node)

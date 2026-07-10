@@ -35,7 +35,7 @@ internal void arena_release(Arena *arena) {
 internal void* arena_push(Arena* arena, U64 size, U64 align) {
     U64 begin;
     U64 end;
-    U64 commit_target;;
+    U64 commit_target;
     U8* commit_ptr;
     void* user_ptr;
 
