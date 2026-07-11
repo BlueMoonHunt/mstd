@@ -386,6 +386,7 @@ int memcmp(const void* buffer1, const void* buffer2, size_t count);
 
 /* Arena */
 typedef struct ArenaTempNode {
+    U64 cursor;
     struct ArenaTempNode* next;
 } ArenaTempNode;
 
@@ -433,7 +434,7 @@ internal Arena* arena_scratch_begin_(ArenaAllocOpt opt);
 internal void arena_scratch_end(Arena* scratch_arena);
 
 #define arena_scratch_begin(...) arena_scratch_begin_((ArenaAllocOpt){.no_opt = 0, __VA_ARGS__})
-#define arena_scratch_scope(arena) for (Arena* arena = arena_scratch_begin(); arena; arena_scratch_end(arena), arena = 0)
+#define arena_scratch_scope(arena) for (arena = arena_scratch_begin(); arena; arena_scratch_end(arena), arena = 0)
 
 typedef struct UnicodeDecode {
     U32 inc;
@@ -583,7 +584,7 @@ internal U32 str8_match_(Str8 a, Str8 b, Str8MatchOpt opt);
 internal U64 str8_find_(Str8 string, Str8 substring, U64 offset, Str8MatchOpt opt);
 internal U64 str8_find_reverse_(Str8 string, Str8 substring, U64 offset, Str8MatchOpt opt);
 
-#define str8_match(a, b, ...) str8_match_(a, b, (Str8MatchOpt){h})
+#define str8_match(a, b, ...) str8_match_(a, b, (Str8MatchOpt){.no_opt = 0, __VA_ARGS__})
 #define str8_find(string, substring, offset, ...) str8_find_(string, substring, offset, (Str8MatchOpt){.no_opt = 0, __VA_ARGS__})
 #define str8_find_reverse(string, substring, offset, ...) str8_find_(string, substring, offset, (Str8MatchOpt){.no_opt = 0, __VA_ARGS__})
 
@@ -862,6 +863,10 @@ typedef struct Timer {
 internal Timer timer_start(void);
 internal void timer_update(Timer* timer);
 internal U64 timer_get_timestamp(Timer* timer);
+
+/* Debug */
+
+typedef U32 (debug_callback)(void* user_data);
 
 /* DArray */
 
