@@ -1,6 +1,7 @@
 internal Handle os_lib_load(Str8 name) {
     Handle handle;
     Str16 name16;
+    Arena* scratch;
 
     arena_scratch_scope(scratch) {
         name16 = str16_from_8(scratch, name);

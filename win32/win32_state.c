@@ -33,7 +33,7 @@ internal U64 os_ticks_now(void) {
     return (U64)(counter.QuadPart);
 }
 
-internal void os_state_init() {
+internal void os_state_init(void) {
     SYSTEM_INFO system_info = {0};
     LARGE_INTEGER resolution;
     Arena* scratch;

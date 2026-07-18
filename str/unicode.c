@@ -6,6 +6,7 @@ internal UnicodeDecode utf8_decode(U8* str, U64 max) {
     UnicodeDecode result;
     U8 byte;
     U8 byte_class;
+    U8 cont_byte[3];
 
     result.inc = 1;
     result.codepoint = u32_max;
@@ -19,17 +20,18 @@ internal UnicodeDecode utf8_decode(U8* str, U64 max) {
     } break;
     case 2: {
         if (1 < max) {
-            U8 cont_byte = str[1];
-            if (utf8_class[cont_byte >> 3] == 0) {
+            cont_byte[0] = str[1];
+            if (utf8_class[cont_byte[0] >> 3] == 0) {
                 result.codepoint = (byte & 0x1f) << 6;
-                result.codepoint |= (cont_byte & 0x3f);
+                result.codepoint |= (cont_byte[0] & 0x3f);
                 result.inc = 2;
             }
         }
     } break;
     case 3: {
         if (2 < max) {
-            U8 cont_byte[2] = {str[1], str[2]};
+            cont_byte[0] = str[1];
+            cont_byte[1] = str[2];
             if (utf8_class[cont_byte[0] >> 3] == 0 && utf8_class[cont_byte[1] >> 3] == 0) {
                 result.codepoint = (byte & 0xf) << 12;
                 result.codepoint |= ((cont_byte[0] & 0x3f) << 6);
@@ -40,7 +42,9 @@ internal UnicodeDecode utf8_decode(U8* str, U64 max) {
     } break;
     case 4: {
         if (3 < max) {
-            U8 cont_byte[3] = {str[1], str[2], str[3]};
+            cont_byte[0] = str[1];
+            cont_byte[1] = str[2];
+            cont_byte[2] = str[3];
             if (utf8_class[cont_byte[0] >> 3] == 0 && utf8_class[cont_byte[1] >> 3] == 0 &&
                 utf8_class[cont_byte[2] >> 3] == 0) {
                 result.codepoint = (byte & 0x7) << 18;

@@ -386,6 +386,7 @@ int memcmp(const void* buffer1, const void* buffer2, size_t count);
 
 /* Arena */
 typedef struct ArenaTempNode {
+    U64 cursor;
     struct ArenaTempNode* next;
 } ArenaTempNode;
 
@@ -433,7 +434,7 @@ internal Arena* arena_scratch_begin_(ArenaAllocOpt opt);
 internal void arena_scratch_end(Arena* scratch_arena);
 
 #define arena_scratch_begin(...) arena_scratch_begin_((ArenaAllocOpt){.no_opt = 0, __VA_ARGS__})
-#define arena_scratch_scope(arena) for (Arena* arena = arena_scratch_begin(); arena; arena_scratch_end(arena), arena = 0)
+#define arena_scratch_scope(arena) for (arena = arena_scratch_begin(); arena; arena_scratch_end(arena), arena = 0)
 
 typedef struct UnicodeDecode {
     U32 inc;
@@ -470,86 +471,58 @@ typedef enum CharType {
     CHAR_TYPE_DIGIT16 = (1 << 4)
 } CharType;
 
-align_to(64) global const U8 ASCII_LUT[256] = {
-    /* White-space: Tab, LF, VT, FF, CR, Space */
-    [0x09] = CHAR_TYPE_SPACE,
-    [0x0A] = CHAR_TYPE_SPACE,
-    [0x0B] = CHAR_TYPE_SPACE,
-    [0x0C] = CHAR_TYPE_SPACE,
-    [0x0D] = CHAR_TYPE_SPACE,
-    [0x20] = CHAR_TYPE_SPACE,
-
-    /* Digits: 0-9 (Decimal + Hex) */
-    ['0'] = CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16,
-    ['1'] = CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16,
-    ['2'] = CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16,
-    ['3'] = CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16,
-    ['4'] = CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16,
-    ['5'] = CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16,
-    ['6'] = CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16,
-    ['7'] = CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16,
-    ['8'] = CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16,
-    ['9'] = CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16,
-
-    /* Uppercase Hex: A-F */
-    ['A'] = CHAR_TYPE_UPPER | CHAR_TYPE_DIGIT16,
-    ['B'] = CHAR_TYPE_UPPER | CHAR_TYPE_DIGIT16,
-    ['C'] = CHAR_TYPE_UPPER | CHAR_TYPE_DIGIT16,
-    ['D'] = CHAR_TYPE_UPPER | CHAR_TYPE_DIGIT16,
-    ['E'] = CHAR_TYPE_UPPER | CHAR_TYPE_DIGIT16,
-    ['F'] = CHAR_TYPE_UPPER | CHAR_TYPE_DIGIT16,
-
-    /* Uppercase Non-Hex: G-Z */
-    ['G'] = CHAR_TYPE_UPPER,
-    ['H'] = CHAR_TYPE_UPPER,
-    ['I'] = CHAR_TYPE_UPPER,
-    ['J'] = CHAR_TYPE_UPPER,
-    ['K'] = CHAR_TYPE_UPPER,
-    ['L'] = CHAR_TYPE_UPPER,
-    ['M'] = CHAR_TYPE_UPPER,
-    ['N'] = CHAR_TYPE_UPPER,
-    ['O'] = CHAR_TYPE_UPPER,
-    ['P'] = CHAR_TYPE_UPPER,
-    ['Q'] = CHAR_TYPE_UPPER,
-    ['R'] = CHAR_TYPE_UPPER,
-    ['S'] = CHAR_TYPE_UPPER,
-    ['T'] = CHAR_TYPE_UPPER,
-    ['U'] = CHAR_TYPE_UPPER,
-    ['V'] = CHAR_TYPE_UPPER,
-    ['W'] = CHAR_TYPE_UPPER,
-    ['X'] = CHAR_TYPE_UPPER,
-    ['Y'] = CHAR_TYPE_UPPER,
-    ['Z'] = CHAR_TYPE_UPPER,
-
-    /* Lowercase Hex: a-f */
-    ['a'] = CHAR_TYPE_LOWER | CHAR_TYPE_DIGIT16,
-    ['b'] = CHAR_TYPE_LOWER | CHAR_TYPE_DIGIT16,
-    ['c'] = CHAR_TYPE_LOWER | CHAR_TYPE_DIGIT16,
-    ['d'] = CHAR_TYPE_LOWER | CHAR_TYPE_DIGIT16,
-    ['e'] = CHAR_TYPE_LOWER | CHAR_TYPE_DIGIT16,
-    ['f'] = CHAR_TYPE_LOWER | CHAR_TYPE_DIGIT16,
-
-    /* Lowercase Non-Hex: g-z */
-    ['g'] = CHAR_TYPE_LOWER,
-    ['h'] = CHAR_TYPE_LOWER,
-    ['i'] = CHAR_TYPE_LOWER,
-    ['j'] = CHAR_TYPE_LOWER,
-    ['k'] = CHAR_TYPE_LOWER,
-    ['l'] = CHAR_TYPE_LOWER,
-    ['m'] = CHAR_TYPE_LOWER,
-    ['n'] = CHAR_TYPE_LOWER,
-    ['o'] = CHAR_TYPE_LOWER,
-    ['p'] = CHAR_TYPE_LOWER,
-    ['q'] = CHAR_TYPE_LOWER,
-    ['r'] = CHAR_TYPE_LOWER,
-    ['s'] = CHAR_TYPE_LOWER,
-    ['t'] = CHAR_TYPE_LOWER,
-    ['u'] = CHAR_TYPE_LOWER,
-    ['v'] = CHAR_TYPE_LOWER,
-    ['w'] = CHAR_TYPE_LOWER,
-    ['x'] = CHAR_TYPE_LOWER,
-    ['y'] = CHAR_TYPE_LOWER,
-    ['z'] = CHAR_TYPE_LOWER,
+align_to(64) const U8 ASCII_LUT[256] = {
+    /* 0x00 - 0x07 */
+    0, 0, 0, 0, 0, 0, 0, 0,
+    /* 0x08 - 0x0F (0x09=Tab, 0x0A=LF, 0x0B=VT, 0x0C=FF, 0x0D=CR) */
+    0, CHAR_TYPE_SPACE, CHAR_TYPE_SPACE, CHAR_TYPE_SPACE, CHAR_TYPE_SPACE, CHAR_TYPE_SPACE, 0, 0,
+    /* 0x10 - 0x17 */
+    0, 0, 0, 0, 0, 0, 0, 0,
+    /* 0x18 - 0x1F */
+    0, 0, 0, 0, 0, 0, 0, 0,
+    /* 0x20 - 0x27 (0x20=Space) */
+    CHAR_TYPE_SPACE, 0, 0, 0, 0, 0, 0, 0,
+    /* 0x28 - 0x2F */
+    0, 0, 0, 0, 0, 0, 0, 0,
+    /* 0x30 - 0x37 ('0' through '7') */
+    CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16, CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16,
+    CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16, CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16,
+    CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16, CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16,
+    CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16, CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16,
+    /* 0x38 - 0x3F ('8', '9') */
+    CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16, CHAR_TYPE_DIGIT10 | CHAR_TYPE_DIGIT16,
+    0, 0, 0, 0, 0, 0,
+    /* 0x40 - 0x47 ('A' through 'G') */
+    0, CHAR_TYPE_UPPER | CHAR_TYPE_DIGIT16, CHAR_TYPE_UPPER | CHAR_TYPE_DIGIT16,
+    CHAR_TYPE_UPPER | CHAR_TYPE_DIGIT16, CHAR_TYPE_UPPER | CHAR_TYPE_DIGIT16,
+    CHAR_TYPE_UPPER | CHAR_TYPE_DIGIT16, CHAR_TYPE_UPPER | CHAR_TYPE_DIGIT16,
+    CHAR_TYPE_UPPER,
+    /* 0x48 - 0x4F ('H' through 'O') */
+    CHAR_TYPE_UPPER, CHAR_TYPE_UPPER, CHAR_TYPE_UPPER, CHAR_TYPE_UPPER,
+    CHAR_TYPE_UPPER, CHAR_TYPE_UPPER, CHAR_TYPE_UPPER, CHAR_TYPE_UPPER,
+    /* 0x50 - 0x57 ('P' through 'W') */
+    CHAR_TYPE_UPPER, CHAR_TYPE_UPPER, CHAR_TYPE_UPPER, CHAR_TYPE_UPPER,
+    CHAR_TYPE_UPPER, CHAR_TYPE_UPPER, CHAR_TYPE_UPPER, CHAR_TYPE_UPPER,
+    /* 0x58 - 0x5F ('X', 'Y', 'Z') */
+    CHAR_TYPE_UPPER, CHAR_TYPE_UPPER, CHAR_TYPE_UPPER, 0, 0, 0, 0, 0,
+    /* 0x60 - 0x67 ('a' through 'g') */
+    0, CHAR_TYPE_LOWER | CHAR_TYPE_DIGIT16, CHAR_TYPE_LOWER | CHAR_TYPE_DIGIT16,
+    CHAR_TYPE_LOWER | CHAR_TYPE_DIGIT16, CHAR_TYPE_LOWER | CHAR_TYPE_DIGIT16,
+    CHAR_TYPE_LOWER | CHAR_TYPE_DIGIT16, CHAR_TYPE_LOWER | CHAR_TYPE_DIGIT16,
+    CHAR_TYPE_LOWER,
+    /* 0x68 - 0x6F ('h' through 'o') */
+    CHAR_TYPE_LOWER, CHAR_TYPE_LOWER, CHAR_TYPE_LOWER, CHAR_TYPE_LOWER,
+    CHAR_TYPE_LOWER, CHAR_TYPE_LOWER, CHAR_TYPE_LOWER, CHAR_TYPE_LOWER,
+    /* 0x70 - 0x77 ('p' through 'w') */
+    CHAR_TYPE_LOWER, CHAR_TYPE_LOWER, CHAR_TYPE_LOWER, CHAR_TYPE_LOWER,
+    CHAR_TYPE_LOWER, CHAR_TYPE_LOWER, CHAR_TYPE_LOWER, CHAR_TYPE_LOWER,
+    /* 0x78 - 0x7F ('x', 'y', 'z') */
+    CHAR_TYPE_LOWER, CHAR_TYPE_LOWER, CHAR_TYPE_LOWER, 0, 0, 0, 0, 0,
+    /* 0x80 - 0xFF */
+    0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0
 };
 
 /* Character classification & conversion */
@@ -583,7 +556,7 @@ internal U32 str8_match_(Str8 a, Str8 b, Str8MatchOpt opt);
 internal U64 str8_find_(Str8 string, Str8 substring, U64 offset, Str8MatchOpt opt);
 internal U64 str8_find_reverse_(Str8 string, Str8 substring, U64 offset, Str8MatchOpt opt);
 
-#define str8_match(a, b, ...) str8_match_(a, b, (Str8MatchOpt){h})
+#define str8_match(a, b, ...) str8_match_(a, b, (Str8MatchOpt){.no_opt = 0, __VA_ARGS__})
 #define str8_find(string, substring, offset, ...) str8_find_(string, substring, offset, (Str8MatchOpt){.no_opt = 0, __VA_ARGS__})
 #define str8_find_reverse(string, substring, offset, ...) str8_find_(string, substring, offset, (Str8MatchOpt){.no_opt = 0, __VA_ARGS__})
 
@@ -862,6 +835,10 @@ typedef struct Timer {
 internal Timer timer_start(void);
 internal void timer_update(Timer* timer);
 internal U64 timer_get_timestamp(Timer* timer);
+
+/* Debug */
+
+typedef U32 (debug_callback)(void* user_data);
 
 /* DArray */
 
