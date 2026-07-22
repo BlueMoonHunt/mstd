@@ -1,11 +1,8 @@
 #if !defined(MSTD2_H)
 #define MSTD2_H
 
-#include "core/core.c"
-
-#include "arena/arena.c"
-#include "arena/arena_temp.c"
-#include "arena/arena_scratch.c"
+#include "core/base_type.c"
+#include "core/arena.c"
 
 #include "str/unicode.c"
 #include "str/str8.c"
