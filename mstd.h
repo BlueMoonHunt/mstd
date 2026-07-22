@@ -221,11 +221,6 @@
         b = temp_ab;                                                                                                   \
     } while (0)
 
-#define OPTIONS(T, ...)                                                                                                \
-    typedef struct T {                                                                                                 \
-        U8 no_opt;                                                                                                     \
-        __VA_ARGS__                                                                                                    \
-    } T
 #define NPOS (U64)(-1)
 #define STRNPOS NPOS
 
@@ -414,13 +409,12 @@ typedef struct Arena {
 #define ARENA_DEFAULT_SCRATCH_COUNT 4
 #endif
 
-OPTIONS(ArenaAllocOpt, U64 reserve_size; U64 commit_size; U8 large_pages;);
-internal Arena* arena_alloc_(ArenaAllocOpt opt);
+internal Arena* arena_alloc(U64 reserve_size, U64 commit_size, U8 enable_large_pages);
 internal void* arena_push(Arena* arena, U64 size, U64 alignment);
 internal void arena_release(Arena* arena);
 internal void arena_reset(Arena* arena);
 
-#define arena_alloc(...) arena_alloc_((ArenaAllocOpt){.no_opt = 0, __VA_ARGS__})
+#define arena_alloc_default() arena_alloc(ARENA_DEFAULT_RESERVE_SIZE, ARENA_DEFAULT_COMMIT_SIZE, 0)
 #define arena_push_type(arena, T) arena_push(arena, sizeof(T), align_of(T))
 #define arena_push_array(arena, T, count) arena_push(arena, sizeof(T) * count, align_of(T))
 
@@ -430,10 +424,9 @@ internal void arena_temp_end_all(Arena* arena);
 
 #define arena_temp_scope(arena) scope(arena_temp_begin(arena), arena_temp_end(arena))
 
-internal Arena* arena_scratch_begin_(ArenaAllocOpt opt);
+internal Arena* arena_scratch_begin(void);
 internal void arena_scratch_end(Arena* scratch_arena);
 
-#define arena_scratch_begin(...) arena_scratch_begin_((ArenaAllocOpt){.no_opt = 0, __VA_ARGS__})
 #define arena_scratch_scope(arena) for (arena = arena_scratch_begin(); arena; arena_scratch_end(arena), arena = 0)
 
 typedef struct UnicodeDecode {
@@ -578,15 +571,16 @@ internal Str8 str8_from_mem_size(Arena* arena, U64 size);
 internal Str8 str8_from_slice(Arena* arena, Str8Slice slice);
 
 /* String Matching */
-OPTIONS(Str8MatchOpt, U8 case_insensitive; U8 slash_insensitive;);
+typedef enum Str8MatchFlag {
+    STR8_MATCH_FLAG_NONE = 0,
+    STR8_MATCH_FLAG_CASE_INSENSITIVE = 1,
+    STR8_MATCH_FLAG_SLASH_INSENSITIVE = 2,
+    STR8_MATCH_FLAG_COUNT,
+}Str8MatchFlag;
 
-internal U32 str8_match_(Str8 a, Str8 b, Str8MatchOpt opt);
-internal U64 str8_find_(Str8 string, Str8 substring, U64 offset, Str8MatchOpt opt);
-internal U64 str8_find_reverse_(Str8 string, Str8 substring, U64 offset, Str8MatchOpt opt);
-
-#define str8_match(a, b, ...) str8_match_(a, b, (Str8MatchOpt){.no_opt = 0, __VA_ARGS__})
-#define str8_find(string, substring, offset, ...) str8_find_(string, substring, offset, (Str8MatchOpt){.no_opt = 0, __VA_ARGS__})
-#define str8_find_reverse(string, substring, offset, ...) str8_find_(string, substring, offset, (Str8MatchOpt){.no_opt = 0, __VA_ARGS__})
+internal U32 str8_match(Str8 a, Str8 b, enum_val(Str8MatchFlag, U32) flags);
+internal U64 str8_find(Str8 target, Str8 query, U64 offset, enum_val(Str8MatchFlag, U32) flags);
+internal U64 str8_find_reverse(Str8 target, Str8 query, U64 offset, enum_val(Str8MatchFlag, U32) flags);
 
 /* String concatinate and copy */
 internal Str8 str8_concat(Arena* arena, Str8 a, Str8 b);
@@ -598,10 +592,9 @@ internal Str8 str8_copy(Arena* arena, Str8 str);
 internal char* str8_copy_to_cstr(Arena* arena, Str8 str);
 
 /* String slicing */
-OPTIONS(Str8SliceOpt, Str8 delimiter; U8 postfix;);
-internal Str8Slice str8_slice_(Str8Slice str, U64 pos, Str8SliceOpt opt);
-
-#define str8_slice(str, pos, ...) str8_slice_((Str8Slice)(str), (pos), (Str8SliceOpt){.no_opt = 0, __VA_ARGS__})
+internal Str8Slice str8_slice(Str8Slice str, U64 pos, U8 give_postfix);
+internal Str8Slice str8_slice_head_until(Str8Slice str, Str8 delimiter, U8 give_postfix);
+internal Str8Slice str8_slice_tail_until(Str8Slice str, Str8 delimiter, U8 give_postfix);
 
 typedef struct Str16 {
     U16* data;
@@ -830,26 +823,23 @@ internal void os_file_watcher_destroy(FileWatcher* watcher);
 
 /* CMD */
 
-typedef enum CmdPiority {
-    CMD_PRIORITY_NORMAL,
-    CMD_PRIORITY_IDLE,
-    CMD_PRIORITY_HIGH,
-    CMD_PRIORITY_REALTIME
-} CmdPiority;
+typedef enum CmdFlag {
+    CMD_FLAG_PRIORITY_NORMAL    = BIT(0),
+    CMD_FLAG_PRIORITY_IDLE      = BIT(1),
+    CMD_FLAG_PRIORITY_HIGH      = BIT(2),
+    CMD_FLAG_PRIORITY_REALTIME  = BIT(3),
+    CMD_FLAG_HIDDEN             = BIT(4),
+    CMD_FLAG_INHERIT_HANDLE     = BIT(5),
+    CMD_FLAG_RUN_DITACHED       = BIT(6)
+} CmdFlag;
 
 internal void os_cli_alloc(U32 if_not_exists);
 
-OPTIONS(CmdOpt,
-    U8 no_reset;
-    U8 hidden;
-    U8 inherit_handles;
-    U8 run_ditached;
-    enum_val(CmdPiority, U8) priority;
-);
+internal U32 os_cmd(char* command, enum_val(CmdFlag, U8) flags);
 
-internal U32 os_cmd_opt(char* command, CmdOpt opt);
-
-#define cmd(command, ...) os_cmd_opt(command, (CmdOpt){.no_opt = 0, __VA_ARGS__})
+#define cmd(command)            os_cmd((command), CMD_FLAG_PRIORITY_NORMAL)
+#define cmd_background(command) os_cmd((command), CMD_FLAG_RUN_DITACHED | CMD_FLAG_HIDDEN | CMD_FLAG_PRIORITY_LOW)
+#define cmd_ex(command, flags)  os_cmd((command), (flags))
 
 /* Timer */
 

@@ -121,7 +121,7 @@ internal Str8 str8_from_slice(Arena* arena, Str8Slice slice) {
     return result;
 }
 
-internal U32 str8_match_(Str8 a, Str8 b, Str8MatchOpt opt) {
+internal U32 str8_match(Str8 a, Str8 b, enum_val(Str8MatchFlag, U32) flags) {
     U32 match;
     U64 i;
     U8 ca;
@@ -129,15 +129,15 @@ internal U32 str8_match_(Str8 a, Str8 b, Str8MatchOpt opt) {
 
     match = 0;
 
-    if (a.size == b.size && (opt.case_insensitive || opt.slash_insensitive)) {
+    if (a.size == b.size && flags) {
         for (i = 0; i < a.size; ++i) {
             ca = a.data[i];
             cb = b.data[i];
-            if (opt.case_insensitive) {
+            if (flags & STR8_MATCH_FLAG_CASE_INSENSITIVE) {
                 ca = char_to_lower(ca);
                 cb = char_to_lower(cb);
             }
-            if (opt.slash_insensitive) {
+            if (flags & STR8_MATCH_FLAG_SLASH_INSENSITIVE) {
                 if (char_is_slash(ca))
                     ca = '/';
                 if (char_is_slash(cb))
@@ -154,34 +154,39 @@ internal U32 str8_match_(Str8 a, Str8 b, Str8MatchOpt opt) {
     return match;
 }
 
-internal U64 str8_find_(Str8 string, Str8 substring, U64 offset, Str8MatchOpt opt) {
+internal U64 str8_find(Str8 target, Str8 query, U64 offset, enum_val(Str8MatchFlag, U32) flags) {
     U64 result;
     U8* cursor;
     U8* stop;
-    U8 c_substr;
-    U8 c_str;
+    U8 c1;
+    U8 c2;
+    Str8 sub_str;
 
     result = STRNPOS;
 
-    if (substring.size > 0 && string.size >= (substring.size + offset)) {
-        stop = string.data + string.size - substring.size + 1;
+    if (query.size > 0 && target.size >= (query.size + offset)) {
+        stop = target.data + target.size - query.size + 1;
 
-        for (cursor = string.data + offset; cursor < stop; cursor++) {
-            c_substr = substring.data[0];
-            c_str = *cursor;
+        for (cursor = target.data + offset; cursor < stop; cursor++) {
+            c1 = query.data[0];
+            c2 = *cursor;
 
-            if (opt.case_insensitive) {
-                c_substr = char_to_lower(c_substr);
-                c_str = char_to_lower(c_str);
+            if (flags & STR8_MATCH_FLAG_CASE_INSENSITIVE) {
+                c1 = char_to_lower(c1);
+                c2 = char_to_lower(c2);
             }
-            if (opt.slash_insensitive) {
-                if (char_is_slash(c_substr))
-                    c_substr = '/';
-                if (char_is_slash(c_str))
-                    c_str = '/';
+            if (flags & STR8_MATCH_FLAG_SLASH_INSENSITIVE) {
+                if (char_is_slash(c1))
+                    c1 = '/';
+                if (char_is_slash(c2))
+                    c2 = '/';
             }
-            if (c_str == c_substr && str8_match_((Str8){.data = cursor, .size = substring.size}, substring, opt)) {
-                result = (U64)(cursor - string.data);
+
+            sub_str.data = cursor;
+            sub_str.size = query.size;
+
+            if (c2 == c1 && str8_match(sub_str, query, flags)) {
+                result = (U64)(cursor - target.data);
                 break;
             }
         }
@@ -190,31 +195,36 @@ internal U64 str8_find_(Str8 string, Str8 substring, U64 offset, Str8MatchOpt op
     return result;
 }
 
-internal U64 str8_find_reverse_(Str8 string, Str8 substring, U64 offset, Str8MatchOpt opt) {
+internal U64 str8_find_reverse(Str8 target, Str8 query, U64 offset, enum_val(Str8MatchFlag, U32) flags) {
     U64 result;
     U8* cursor;
-    U8 c_substr;
-    U8 c_str;
+    U8 c1;
+    U8 c2;
+    Str8 sub_str;
 
     result = STRNPOS;
 
-    if (substring.size > 0 && string.size >= (substring.size + offset))
-        for (cursor = string.data + string.size - offset - substring.size; cursor >= string.data; cursor--) {
-            c_substr = substring.data[0];
-            c_str = *cursor;
+    if (query.size > 0 && target.size >= (query.size + offset))
+        for (cursor = target.data + target.size - offset - query.size; cursor >= target.data; cursor--) {
+            c1 = query.data[0];
+            c2 = *cursor;
 
-            if (opt.case_insensitive) {
-                c_substr = char_to_lower(c_substr);
-                c_str = char_to_lower(c_str);
+            if (flags & STR8_MATCH_FLAG_CASE_INSENSITIVE) {
+                c1 = char_to_lower(c1);
+                c2 = char_to_lower(c2);
             }
-            if (opt.slash_insensitive) {
-                if (char_is_slash(c_substr))
-                    c_substr = '/';
-                if (char_is_slash(c_str))
-                    c_str = '/';
+            if (flags & STR8_MATCH_FLAG_SLASH_INSENSITIVE) {
+                if (char_is_slash(c1))
+                    c1 = '/';
+                if (char_is_slash(c2))
+                    c2 = '/';
             }
-            if (c_str == c_substr && str8_match_((Str8){.data = cursor, .size = substring.size}, substring, opt)) {
-                result = (U64)(cursor - string.data);
+
+            sub_str.data = cursor;
+            sub_str.size = query.size;
+
+            if (c2 == c1 && str8_match(sub_str, query, flags)) {
+                result = (U64)(cursor - target.data);
                 break;
             }
         }
@@ -264,48 +274,86 @@ internal Str8 str8_concat_n_(Arena* arena, ...) {
 }
 
 internal Str8 str8_copy(Arena *arena, Str8 str) {
-    Str8 string;
+    Str8 target;
 
-    string = str8_from_mem_size(arena, str.size);
-    mem_copy_array(string.data, str.data, str.size);
-    string.data[string.size] = 0;
+    target = str8_from_mem_size(arena, str.size);
+    mem_copy_array(target.data, str.data, str.size);
+    target.data[target.size] = 0;
 
-    return string;
+    return target;
 }
 
 internal char *str8_copy_to_cstr(Arena *arena, Str8 str) {
-    char* string;
+    char* target;
 
-    string = arena_push_array(arena, char, str.size + 1);
-    mem_copy_array(string, str.data, str.size);
-    string[str.size] = 0;
+    target = arena_push_array(arena, char, str.size + 1);
+    mem_copy_array(target, str.data, str.size);
+    target[str.size] = 0;
 
-    return string;
+    return target;
 }
 
-internal Str8Slice str8_slice_(Str8Slice str, U64 pos, Str8SliceOpt opt) {
+internal Str8Slice str8_slice(Str8Slice str, U64 pos, U8 give_postfix) {
+    pos = clamp_top(pos, str.size);
+
+    if (give_postfix) {
+        str.data += pos;
+        str.size -= pos;
+    }
+    else {
+        str.size = pos;
+    }
+
+    return str;
+}
+
+internal Str8Slice str8_slice_head_until(Str8Slice str, Str8 delimiter, U8 give_postfix) {
     U64 i;
     U8 delimiter_lookup[256];
 
     mem_set(delimiter_lookup, 0, sizeof(delimiter_lookup));
-    pos = clamp_top(pos, str.size);
 
-    if (opt.postfix) {
-        str.data += pos;
-        str.size -= pos;
-    } else
-        str.size = pos;
+    for (i = 0; i < delimiter.size; i++) {
+        delimiter_lookup[delimiter.data[i]] = 1;
+    }
 
-    if (opt.delimiter.size > 0) {
-        for (i = 0; i < opt.delimiter.size; i++) {
-            delimiter_lookup[opt.delimiter.data[i]] = 1;
-        }
-        for (i = 0; i < str.size; i++) {
-            if (delimiter_lookup[str.data[i]]) {
-                str.size = i;
-                break;
-            }
-        }
+    for (i = 0; i < str.size && !delimiter_lookup[str.data[i]]; i++);
+
+    if (give_postfix) {
+        if (i < str.size)
+            i++;
+
+        str.data += i;
+        str.size -= i;
+    }
+    else {
+        str.size = i;
+    }
+
+    return str;
+}
+
+internal Str8Slice str8_slice_tail_until(Str8Slice str, Str8 delimiter, U8 give_postfix) {
+    U64 i;
+    U8 delimiter_lookup[256];
+
+    mem_set(delimiter_lookup, 0, sizeof(delimiter_lookup));
+
+    for (i = 0; i < delimiter.size; i++) {
+        delimiter_lookup[delimiter.data[i]] = 1;
+    }
+
+    for (i = str.size; i > 0 && !delimiter_lookup[str.data[i - 1]]; i--);
+
+    if (give_postfix) {
+        str.data += i;
+        str.size -= i;
+    }
+    else {
+        if (i > 0)
+            i--;
+
+        str.size = i;
     }
 
     return str;

@@ -1,6 +1,6 @@
 #include <mstd.h>
 
-internal Arena* arena_alloc_(ArenaAllocOpt opt) {
+internal Arena* arena_alloc(U64 reserve_size, U64 commit_size, U8 enable_large_pages) {
     Arena* arena;
     U64 page_size;
     void* memory;
@@ -8,20 +8,20 @@ internal Arena* arena_alloc_(ArenaAllocOpt opt) {
     if (!os_state.system_info.page_size || !os_state.system_info.large_page_size)
         os_state_init();
 
-    page_size = (opt.large_pages) ? os_get_system_info()->large_page_size : os_get_system_info()->page_size;
+    page_size = (enable_large_pages) ? os_get_system_info()->large_page_size : os_get_system_info()->page_size;
 
-    opt.reserve_size = (opt.reserve_size) ? align_up_pow2(opt.reserve_size, page_size) : ARENA_DEFAULT_RESERVE_SIZE;
-    opt.commit_size = (opt.commit_size) ? align_up_pow2(ARENA_HEADER_SIZE, page_size) : ARENA_DEFAULT_COMMIT_SIZE;
+    reserve_size = (reserve_size) ? align_up_pow2(reserve_size, page_size) : ARENA_DEFAULT_RESERVE_SIZE;
+    commit_size = (commit_size) ? align_up_pow2(ARENA_HEADER_SIZE, page_size) : ARENA_DEFAULT_COMMIT_SIZE;
 
-    memory = os_memory_reserve(opt.reserve_size, opt.large_pages);
-    os_memory_commit(memory, opt.commit_size, opt.large_pages);
+    memory = os_memory_reserve(reserve_size, enable_large_pages);
+    os_memory_commit(memory, commit_size, enable_large_pages);
 
     arena = (Arena *)memory;
-    arena->reserved                 = opt.reserve_size;
-    arena->committed                = opt.commit_size;
+    arena->reserved                 = reserve_size;
+    arena->committed                = commit_size;
     arena->page_size                = page_size;
     arena->cursor                   = ARENA_HEADER_SIZE;
-    arena->can_commit_large_pages   = opt.large_pages;
+    arena->can_commit_large_pages   = enable_large_pages;
     arena->temp_stack_head          = 0;
     arena->temp_stack_tail          = 0;
 

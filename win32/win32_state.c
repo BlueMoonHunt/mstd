@@ -33,7 +33,7 @@ internal U64 os_ticks_now(void) {
     return (U64)(counter.QuadPart);
 }
 
-internal void os_state_init() {
+internal void os_state_init(void) {
     SYSTEM_INFO system_info = {0};
     LARGE_INTEGER resolution;
     Arena* scratch;
@@ -52,7 +52,7 @@ internal void os_state_init() {
     os_state.system_info.allocation_granularity      = system_info.dwAllocationGranularity;
     os_state.system_info.large_page_size             = GetLargePageMinimum();
 
-    os_state.arena = arena_alloc(); /* requires [os_state.system_info.page_size] */
+    os_state.arena = arena_alloc_default(); /* requires [os_state.system_info.page_size] */
 
     scratch = arena_scratch_begin();
     buffer_size = KB(32);

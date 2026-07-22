@@ -1,7 +1,7 @@
 global thread_var Arena* scratch_pool[ARENA_DEFAULT_SCRATCH_COUNT] = {0};
 global thread_var U8 scratch_pool_mask = (1u << ARENA_DEFAULT_SCRATCH_COUNT) - 1;
 
-internal Arena* arena_scratch_begin_(ArenaAllocOpt opt) {
+internal Arena* arena_scratch_begin(void) {
     I32 index;
     Arena* arena = 0;
 
@@ -10,7 +10,7 @@ internal Arena* arena_scratch_begin_(ArenaAllocOpt opt) {
     if (index >= 0 && index < ARENA_DEFAULT_SCRATCH_COUNT) {
         arena = scratch_pool[index];
         if (!arena) {
-            arena = arena_alloc_(opt);
+            arena = arena_alloc_default();
             scratch_pool[index] = arena;
         }
         arena_reset(arena);
