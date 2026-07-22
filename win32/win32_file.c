@@ -20,13 +20,14 @@ internal U32 os_file_delete(Str8 path) {
 
 internal U32 os_file_copy(Str8 src, Str8 dest) {
     I32 sleep_ms;
+    DWORD err;
     I32 i;
 
     for (i = 0, sleep_ms = 1; i < OS_FILE_OP_MAX_RETRIES; i++) {
         if (CopyFileExA((char *)src.data, (char *)dest.data, NULL, NULL, FALSE, 0))
             return 1;
 
-        DWORD err = GetLastError();
+        err = GetLastError();
         if (err != ERROR_SHARING_VIOLATION && err != ERROR_ACCESS_DENIED && err != ERROR_LOCK_VIOLATION)
             break;
 
@@ -40,13 +41,14 @@ internal U32 os_file_copy(Str8 src, Str8 dest) {
 internal U32 os_file_move(Str8 src, Str8 dest) {
     I32 i;
     I32 sleep_ms;
+    DWORD err;
 
     for (i = 0, sleep_ms = 1; i < OS_FILE_OP_MAX_RETRIES; i++) {
         if (MoveFileExA((char*)src.data, (char*)dest.data, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH)) {
             return 1;
         }
 
-        DWORD err = GetLastError();
+        err = GetLastError();
         if (err != ERROR_SHARING_VIOLATION && err != ERROR_LOCK_VIOLATION)
             break;
 
@@ -125,27 +127,35 @@ internal U64 os_file_size(Handle handle) {
 internal void os_file_close(Handle handle) { CloseHandle((HANDLE)handle.val[0]); }
 
 internal Str8 os_file_read(Arena *arena, Handle handle, U64 offset, U64 size) {
-    U64 total_read_size = 0;
-
+    U64 remaining;
+    DWORD to_read;
+    DWORD actual_read;
+    U64 total_read_size;
     Str8 str;
+    HANDLE file;
+    U64 _size;
+    U64 _offset;
+    U64 total_to_read;
+    U8 *out;
+    OVERLAPPED overlapped;
 
+    total_read_size = 0;
     str.data = 0;
     str.size = 0;
 
     if (handle.val[0]) {
-        HANDLE file = (HANDLE)handle.val[0];
-        U64 _size = 0;
+        file = (HANDLE)handle.val[0];
+        _size = 0;
         GetFileSizeEx(file, (LARGE_INTEGER *)&_size);
 
-        U64 total_to_read = clamp_top(size, _size);
-        U8 *out = arena_push_array(arena, U8, total_to_read + 1);
+        total_to_read = clamp_top(size, _size);
+        out = arena_push_array(arena, U8, total_to_read + 1);
 
-        for (U64 _offset = offset; total_read_size < total_to_read;) {
-            U64 remaining = total_to_read - total_read_size;
-            DWORD to_read = (DWORD)clamp_top(remaining, u32_max);
-            DWORD actual_read = 0;
+        for (_offset = offset; total_read_size < total_to_read;) {
+            remaining = total_to_read - total_read_size;
+            to_read = (DWORD)clamp_top(remaining, u32_max);
+            actual_read = 0;
 
-            OVERLAPPED overlapped = {0};
             overlapped.Offset = (DWORD)(_offset & u32_max);
             overlapped.OffsetHigh = (DWORD)(_offset >> 32);
 
@@ -167,19 +177,23 @@ internal Str8 os_file_read(Arena *arena, Handle handle, U64 offset, U64 size) {
 }
 
 internal void os_file_write(Handle handle, void *data, U64 offset, U64 size) {
-    U64 total_written = 0;
+    DWORD to_write;
+    DWORD actual_write;
+    U64 total_written;
+    U64 dest_offset;
+    U64 remaining;
+    OVERLAPPED overlapped;
 
     if (handle.val[0]) {
-        for (U64 dest_offset = offset;;) {
+        for (dest_offset = offset, total_written = 0;;) {
 
-            U64 remaining = size - total_written;
+            remaining = size - total_written;
             if (remaining == 0)
                 break;
 
-            DWORD to_write = (DWORD)clamp_top(remaining, MB(1));
-            DWORD actual_write = 0;
+            to_write = (DWORD)clamp_top(remaining, MB(1));
+            actual_write = 0;
 
-            OVERLAPPED overlapped = {0};
             overlapped.Offset = (DWORD)(dest_offset & 0xFFFFFFFF);
             overlapped.OffsetHigh = (DWORD)(dest_offset >> 32);
 
@@ -195,14 +209,17 @@ internal void os_file_write(Handle handle, void *data, U64 offset, U64 size) {
 }
 
 internal FileWatcher *os_file_watcher_create(Arena *arena, Str8 path, U32 watch_sub_directory) {
-    Arena *scratch = arena_scratch_begin();
-    Str16 u16_path = str16_from_8(scratch, path);
+    FileWatcher *result;
+    Arena *scratch;
+    Str16 u16_path;
+    HANDLE dir;
+    struct Win32FileWatcher watcher;
 
-    HANDLE dir =
-        CreateFileW((LPCWSTR)u16_path.data, FILE_LIST_DIRECTORY, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+    scratch = arena_scratch_begin();
+    u16_path = str16_from_8(scratch, path);
+
+    dir = CreateFileW((LPCWSTR)u16_path.data, FILE_LIST_DIRECTORY, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                     NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
-
-    struct Win32FileWatcher watcher = {0};
 
     if (dir == INVALID_HANDLE_VALUE)
         return NULL;
@@ -216,22 +233,29 @@ internal FileWatcher *os_file_watcher_create(Arena *arena, Str8 path, U32 watch_
                           NULL, &watcher.overlapped, NULL);
 
     arena_scratch_end(scratch);
-    FileWatcher *result = (FileWatcher *)arena_push_type(arena, struct Win32FileWatcher);
+    result = (FileWatcher *)arena_push_type(arena, struct Win32FileWatcher);
     return (result);
 }
 
 internal FileEvent *os_file_watcher_poll_events(FileWatcher *watcher, Arena *arena, U32 timeout_ms, U32 *out_count) {
-    DWORD bytes = 0;
-    ULONG_PTR key = 0;
-    LPOVERLAPPED p_overlapped = NULL;
+    DWORD bytes;
+    ULONG_PTR key;
+    LPOVERLAPPED p_overlapped;
+    FileEvent *result_array;
+    U32 count;
+    U32 i;
+    FILE_NOTIFY_INFORMATION *notify;
+    U32 name_len_chars;
+    Str16 u16_file;
 
-    FileEvent *result_array = NULL;
-    U32 count = 0;
+    count = 0;
+    result_array = 0;
 
     if (GetQueuedCompletionStatus(watcher->iocp, &bytes, &key, &p_overlapped, (DWORD)timeout_ms)) {
+
         if (p_overlapped == &watcher->overlapped && bytes > 0) {
 
-            FILE_NOTIFY_INFORMATION *notify = (FILE_NOTIFY_INFORMATION *)watcher->notification_buffer;
+            notify = (FILE_NOTIFY_INFORMATION *)watcher->notification_buffer;
             for (;;) {
                 count++;
                 if (notify->NextEntryOffset == 0)
@@ -243,9 +267,10 @@ internal FileEvent *os_file_watcher_poll_events(FileWatcher *watcher, Arena *are
 
             notify = (FILE_NOTIFY_INFORMATION *)watcher->notification_buffer;
 
-            for (U32 i = 0; i < count; i++) {
-                U32 name_len_chars = notify->FileNameLength / sizeof(U16);
-                Str16 u16_file = {(U16 *)notify->FileName, name_len_chars};
+            for (i = 0; i < count; i++) {
+                name_len_chars = notify->FileNameLength / sizeof(U16);
+                u16_file.data = notify->FileName;
+                u16_file.size = name_len_chars;
 
                 result_array[i].file_name = str8_from_16(arena, u16_file);
                 switch (notify->Action) {
