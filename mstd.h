@@ -103,10 +103,9 @@
 #endif
 
 #if OS_WINDOWS
-#define NOGDI
-#define NOUSER
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <shellapi.h>
 #endif
 
 /* Keywords */
@@ -464,7 +463,7 @@ typedef enum CharType {
     CHAR_TYPE_DIGIT16 = (1 << 4)
 } CharType;
 
-align_to(64) global const u8 ASCII_LUT[256] = {
+align_to(64) global const U8 ASCII_LUT[256] = {
     // White-space: Tab, LF, VT, FF, CR, Space
     [0x09] = CHAR_TYPE_SPACE,
     [0x0A] = CHAR_TYPE_SPACE,
@@ -836,10 +835,13 @@ typedef enum CmdFlag {
 internal void os_cli_alloc(U32 if_not_exists);
 
 internal U32 os_cmd(char* command, enum_val(CmdFlag, U8) flags);
+internal void os_cmd_line_args(Arena* arena, I32* argc, Str8** argv);
 
 #define cmd(command)            os_cmd((command), CMD_FLAG_PRIORITY_NORMAL)
 #define cmd_background(command) os_cmd((command), CMD_FLAG_RUN_DITACHED | CMD_FLAG_HIDDEN | CMD_FLAG_PRIORITY_LOW)
 #define cmd_ex(command, flags)  os_cmd((command), (flags))
+
+#define cmd_line_args(arena, argc, argv) os_cmd_line_args(arena, &argc, &argv)
 
 /* Timer */
 

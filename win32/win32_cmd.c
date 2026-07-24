@@ -10,6 +10,23 @@ internal void os_cli_alloc(U32 if_not_exists) {
     }
 }
 
+internal void os_cmd_line_args(Arena* arena, I32* argc, Str8** argv) {
+    I32 count, i;
+    LPWSTR* args;
+
+    count = 0;
+    args = CommandLineToArgvW(GetCommandLineW(), &count);
+
+    *argv = arena_push_array(arena, Str8, count);
+    *argc = count;
+
+    for (i = 0; i < count; i++) {
+        *argv[i] = str8_from_16(arena, str16(args[i]));
+    }
+
+    LocalFree(args);
+}
+
 internal U32 os_cmd(char* command, enum_val(CmdFlag, U8) flags) {
     DWORD priority;
     Arena* arena;
