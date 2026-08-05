@@ -3,7 +3,7 @@ internal Timer timer_start(void) {
 
     timer.ticks = os_ticks_now();
     timer.delta = 16666.6f;
-    timer.resolution_us = os_get_system_info()->allocation_granularity;
+    timer.resolution_us = os_get_system_info()->microsecond_resolution;
     timer.inverse_ticks_per_us = 1000000.0 / (F64)timer.resolution_us;
 
     return timer;
@@ -18,9 +18,6 @@ internal void timer_update(Timer *timer) {
 
     elapsed_ticks = (current_ticks > timer->ticks) ? (current_ticks - timer->ticks) : 0;
     us = (F64)elapsed_ticks * timer->inverse_ticks_per_us;
-
-    if (us > 200000.0)
-        us = 200000.0;
 
     timer->delta = (float)us;
     timer->ticks = current_ticks;
