@@ -161,15 +161,16 @@
 
 /* Units */
 #define BIT(x) (1ULL << (x))
+#define bit(x) (1ULL << (x))
 #define KB(n) (((U64)(n)) << 10)
 #define MB(n) (((U64)(n)) << 20)
 #define GB(n) (((U64)(n)) << 30)
 #define TB(n) (((U64)(n)) << 40)
 
 /* Bit Ops */
-#define bit_unset(val, index) ((val) &= ~BIT(index))
-#define bit_set(val, index) ((val) |= BIT(index))
-#define bit_toggle(val, index) ((val) ^= BIT(index))
+#define bit_unset(val, index) ((val) &= ~bit(index))
+#define bit_set(val, index) ((val) |= bit(index))
+#define bit_toggle(val, index) ((val) ^= bit(index))
 #define bit_is_set(val, index) (((val) >> (index)) & 1ULL)
 
 /* pow2 math */
@@ -202,9 +203,6 @@
 #else
 #error align_to not defined for this compiler.
 #endif
-
-/* Scope Wrappers */
-#define scope(it, begin, end) for ((it) = ((begin), 1); (it); (it) = 0, (end)) /* `it` is used internaly. */
 
 /* Misc */
 #define symbol_to_cstr_(S) #S
@@ -421,8 +419,6 @@ internal void arena_temp_begin(Arena* arena);
 internal void arena_temp_end(Arena* arena);
 internal void arena_temp_end_all(Arena* arena);
 
-#define arena_temp_scope(arena) scope(arena_temp_begin(arena), arena_temp_end(arena))
-
 internal Arena* arena_scratch_begin(void);
 internal void arena_scratch_end(Arena* scratch_arena);
 
@@ -629,6 +625,7 @@ struct SystemInfo {
     U64 page_size;
     U64 large_page_size;
     U64 allocation_granularity;
+    U64 microsecond_resolution;
 };
 
 typedef struct ProcessInfo ProcessInfo;
@@ -643,7 +640,6 @@ struct OSState {
     Arena* arena;
     SystemInfo system_info;
     ProcessInfo process_info;
-    U64 microsecond_resolution;
 };
 
 global OSState os_state;
@@ -689,8 +685,6 @@ internal void  os_mutex_init(Mutex* mutex);
 internal void  os_mutex_take(Mutex* mutex);
 internal void  os_mutex_drop(Mutex* mutex);
 internal void  os_mutex_destroy(Mutex* mutex);
-
-#define  os_mutex_scope(mutex) scope(mutex_take(mutex),  os_mutex_drop(mutex));
 
 /* Read write mutex */
 
@@ -823,13 +817,13 @@ internal void os_file_watcher_destroy(FileWatcher* watcher);
 /* CMD */
 
 typedef enum CmdFlag {
-    CMD_FLAG_PRIORITY_NORMAL    = BIT(0),
-    CMD_FLAG_PRIORITY_IDLE      = BIT(1),
-    CMD_FLAG_PRIORITY_HIGH      = BIT(2),
-    CMD_FLAG_PRIORITY_REALTIME  = BIT(3),
-    CMD_FLAG_HIDDEN             = BIT(4),
-    CMD_FLAG_INHERIT_HANDLE     = BIT(5),
-    CMD_FLAG_RUN_DITACHED       = BIT(6)
+    CMD_FLAG_PRIORITY_NORMAL    = bit(0),
+    CMD_FLAG_PRIORITY_IDLE      = bit(1),
+    CMD_FLAG_PRIORITY_HIGH      = bit(2),
+    CMD_FLAG_PRIORITY_REALTIME  = bit(3),
+    CMD_FLAG_HIDDEN             = bit(4),
+    CMD_FLAG_INHERIT_HANDLE     = bit(5),
+    CMD_FLAG_RUN_DITACHED       = bit(6)
 } CmdFlag;
 
 internal void os_cli_alloc(U32 if_not_exists);

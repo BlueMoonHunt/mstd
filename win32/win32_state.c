@@ -42,15 +42,15 @@ internal void os_state_init(void) {
     U16* path;
     U64 path_length;
 
-    os_state.microsecond_resolution = 1;
-    if (QueryPerformanceFrequency(&resolution))
-        os_state.microsecond_resolution = resolution.QuadPart;
-
     GetSystemInfo(&system_info);
     os_state.system_info.logical_processor_count     = (U64)system_info.dwNumberOfProcessors;
     os_state.system_info.page_size                   = system_info.dwPageSize;
     os_state.system_info.allocation_granularity      = system_info.dwAllocationGranularity;
     os_state.system_info.large_page_size             = GetLargePageMinimum();
+
+    os_state.system_info.microsecond_resolution = 1;
+    if (QueryPerformanceFrequency(&resolution))
+        os_state.system_info.microsecond_resolution = resolution.QuadPart;
 
     os_state.arena = arena_alloc_default(); /* requires [os_state.system_info.page_size] */
 
