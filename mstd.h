@@ -159,6 +159,14 @@
 #define no_inline
 #endif
 
+#if COMPILER_MSVC
+#define unreachable() __assume(0)
+#elif COMPILER_CLANG || COMPILER_GCC
+#define unreachable() __builtin_unreachable()
+#else
+#define unreachable()
+#endif
+
 /* Units */
 #define BIT(x) (1ULL << (x))
 #define bit(x) (1ULL << (x))
@@ -849,6 +857,32 @@ typedef struct Timer {
 internal Timer timer_start(void);
 internal void timer_update(Timer* timer);
 internal U64 timer_get_timestamp(Timer* timer);
+
+/* trace */
+
+#if !TRACE
+#define TRACE 0
+#endif
+
+typedef enum TraceLevel {
+    TRACE_LEVEL_INFO,
+    TRACE_LEVEL_WARNING,
+    TRACE_LEVEL_ERROR,
+}TraceLevel;
+
+global Handle trace_file; /* file handle for trace file */
+global U8 trace_is_hidden; /* trace will not be send to cmd */
+
+#define trace_file_set(file_handle) trace_file = file_handle
+#define trace_hide() trace_is_hidden = 1
+#define trace_is_active() TRACE
+
+internal void trace_(TraceLevel level, Str8 message);
+#define trace(level, message)       \
+    do {                            \
+        if (TRACE)                  \
+            trace_(level, message); \
+    } while (0)
 
 /* Debug */
 

@@ -3,6 +3,7 @@
 
 #include "core/base_type.c"
 #include "core/arena.c"
+#include "core/trace.c"
 
 #include "str/unicode.c"
 #include "str/str8.c"
