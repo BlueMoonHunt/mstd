@@ -243,6 +243,26 @@ typedef uint64_t U64;
 typedef float F32;
 typedef double F64;
 
+typedef enum Type {
+    TYPE_INTEGER = bit(7),
+    TYPE_SIGNED = 1 << 4,
+    TYPE_UNSIGNED = 2 << 4,
+    TYPE_VOID = 0,
+
+    TYPE_U8 = TYPE_INTEGER | TYPE_UNSIGNED | sizeof(U8),
+    TYPE_U16 = TYPE_INTEGER | TYPE_UNSIGNED | sizeof(U16),
+    TYPE_U32 = TYPE_INTEGER | TYPE_UNSIGNED | sizeof(U32),
+    TYPE_U64 = TYPE_INTEGER | TYPE_UNSIGNED | sizeof(U64),
+
+    TYPE_I8 = TYPE_INTEGER | TYPE_SIGNED | sizeof(I8),
+    TYPE_I16 = TYPE_INTEGER | TYPE_SIGNED | sizeof(I16),
+    TYPE_I32 = TYPE_INTEGER | TYPE_SIGNED | sizeof(I32),
+    TYPE_I64 = TYPE_INTEGER | TYPE_SIGNED | sizeof(I64),
+
+    TYPE_F32 = TYPE_SIGNED | sizeof(F32),
+    TYPE_F64 = TYPE_SIGNED | sizeof(F64),
+} Type;
+
 #define enum_val(E,T) T /* To store enum in desired type while keeping it readable. */
 
 /* Atomic */
@@ -259,55 +279,84 @@ typedef AtomicType(I32) atomic_i32;
 typedef AtomicType(I64) atomic_i64;
 
 /* Limits */
+#define U8_MIN 0
+#define U16_MIN 0
+#define U32_MIN 0
+#define U64_MIN 0
+
 #define u8_min 0
 #define u16_min 0
 #define u32_min 0
 #define u64_min 0
 
 #if defined(COMPILER_GCC) || defined(COMPILER_CLANG)
-#define i8_min ((-__INT8_MAX__) - 1)
-#define i8_max __INT8_MAX__
-#define u8_max (__INT8_MAX__ * 2U + 1U)
+#define I8_MIN ((-__INT8_MAX__) - 1)
+#define I8_MAX __INT8_MAX__
+#define U8_MAX (__INT8_MAX__ * 2U + 1U)
 
-#define i16_min ((-__INT16_MAX__) - 1)
-#define i16_max __INT16_MAX__
-#define u16_max (__INT16_MAX__ * 2U + 1U)
+#define I16_MIN ((-__INT16_MAX__) - 1)
+#define I16_MAX __INT16_MAX__
+#define U16_MAX (__INT16_MAX__ * 2U + 1U)
 
-#define i32_min ((-__INT32_MAX__) - 1)
-#define i32_max __INT32_MAX__
-#define u32_max (__INT32_MAX__ * 2U + 1U)
+#define I32_MIN ((-__INT32_MAX__) - 1)
+#define I32_MAX __INT32_MAX__
+#define U32_MAX (__INT32_MAX__ * 2U + 1U)
 
-#define i64_min ((-__INT64_MAX__) - 1LL)
-#define i64_max __INT64_MAX__
-#define u64_max (__INT64_MAX__ * 2ULL + 1ULL)
+#define I64_MIN ((-__INT64_MAX__) - 1LL)
+#define I64_MAX __INT64_MAX__
+#define U64_MAX (__INT64_MAX__ * 2ULL + 1ULL)
 
-#define f32_min __FLT_MIN__
-#define f32_max __FLT_MAX__
-#define f64_min __DBL_MIN__
-#define f64_max __DBL_MAX__
+#define F32_MIN __FLT_MIN__
+#define F32_MAX __FLT_MAX__
+
+#define F64_MIN __DBL_MIN__
+#define F64_MAX __DBL_MAX__
 
 #else
-#define i8_min ((I8)(-127 - 1))
-#define i8_max ((I8)127)
-#define u8_max ((U8)255U)
+#define I8_MIN ((I8)(-127 - 1))
+#define I8_MAX ((I8)127)
+#define U8_MAX ((U8)255U)
 
-#define i16_min ((I16)(-32767 - 1))
-#define i16_max ((I16)32767)
-#define u16_max ((U16)65535U)
+#define I16_MIN ((I16)(-32767 - 1))
+#define I16_MAX ((I16)32767)
+#define U16_MAX ((U16)65535U)
 
-#define i32_min (-2147483647 - 1)
-#define i32_max 2147483647
-#define u32_max 4294967295U
+#define I32_MIN (-2147483647 - 1)
+#define I32_MAX 2147483647
+#define U32_MAX 4294967295U
 
-#define i64_min (-9223372036854775807LL - 1LL)
-#define i64_max 9223372036854775807LL
-#define u64_max 18446744073709551615ULL
+#define I64_MIN (-9223372036854775807LL - 1LL)
+#define I64_MAX 9223372036854775807LL
+#define U64_MAX 18446744073709551615ULL
 
-#define f32_max (*(const float *)(const unsigned int[]){0x7F7FFFFF})
-#define f32_min (*(const float *)(const unsigned int[]){0x00800000})
-#define f64_max (*(const double *)(const unsigned long long[]){0x7FEFFFFFFFFFFFFFULL})
-#define f64_min (*(const double *)(const unsigned long long[]){0x0010000000000000ULL})
+#define F32_MAX (*(const float *)(const unsigned int[]){0x7F7FFFFF})
+#define F32_MIN (*(const float *)(const unsigned int[]){0x00800000})
+
+#define F64_MAX (*(const double *)(const unsigned long long[]){0x7FEFFFFFFFFFFFFFULL})
+#define F64_MIN (*(const double *)(const unsigned long long[]){0x0010000000000000ULL})
 #endif
+
+#define i8_min I8_MIN
+#define i8_max I8_MAX
+#define u8_max U8_MAX
+
+#define i16_min I16_MIN
+#define i16_max I16_MAX
+#define u16_max U16_MAX
+
+#define i32_min I32_MIN
+#define i32_max I32_MAX
+#define u32_max U32_MAX
+
+#define i64_min I64_MIN
+#define i64_max I64_MAX
+#define u64_max U64_MAX
+
+#define f32_min F32_MIN
+#define f32_max F32_MAX
+
+#define f64_min F64_MIN
+#define f64_max F64_MAX
 
 #if COMPILER_MSVC
 
@@ -347,6 +396,19 @@ typedef struct Handle {
 } Handle;
 
 /* Memory */
+
+typedef struct Buffer Buffer;
+struct Buffer {
+    U8* data;
+    U64 size;
+};
+
+typedef struct Buffer_RO Buffer_RO;
+struct Buffer_RO {
+    const U8* data;
+    U64 size;
+};
+
 #if COMPILER_MSVC
 void* memmove(void* dest, const void* src, size_t count);
 int memcmp(const void* buffer1, const void* buffer2, size_t count);
@@ -885,7 +947,6 @@ internal void trace_(TraceLevel level, Str8 message);
     } while (0)
 
 /* Debug */
-
 typedef U32 (debug_callback)(void* user_data);
 
 /* DArray */

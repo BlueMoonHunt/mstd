@@ -153,10 +153,10 @@ internal Str8 os_file_read(Arena *arena, Handle handle, U64 offset, U64 size) {
 
         for (_offset = offset; total_read_size < total_to_read;) {
             remaining = total_to_read - total_read_size;
-            to_read = (DWORD)clamp_top(remaining, u32_max);
+            to_read = (DWORD)clamp_top(remaining, U32_MAX);
             actual_read = 0;
 
-            overlapped.Offset = (DWORD)(_offset & u32_max);
+            overlapped.Offset = (DWORD)(_offset & U32_MAX);
             overlapped.OffsetHigh = (DWORD)(_offset >> 32);
 
             if (ReadFile(file, (U8 *)out + total_read_size, to_read, &actual_read, &overlapped)) {

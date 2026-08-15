@@ -34,7 +34,7 @@ internal U64 os_ticks_now(void) {
 }
 
 internal void os_state_init(void) {
-    SYSTEM_INFO system_info = {0};
+    SYSTEM_INFO system_info;
     LARGE_INTEGER resolution;
     Arena* scratch;
     Str8 bin_path;

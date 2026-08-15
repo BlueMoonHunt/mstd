@@ -9,7 +9,7 @@ internal UnicodeDecode utf8_decode(U8* str, U64 max) {
     U8 cont_byte[3];
 
     result.inc = 1;
-    result.codepoint = u32_max;
+    result.codepoint = U32_MAX;
 
     byte = str[0];
     byte_class = utf8_class[byte >> 3];
@@ -106,7 +106,7 @@ internal U32 utf8_encode(U8* str, U32 codepoint) {
 internal U32 utf16_encode(U16* str, U32 codepoint) {
     U32 inc = 1;
 
-    if (codepoint == u32_max)
+    if (codepoint == U32_MAX)
         str[0] = (U16)'?';
     else if (codepoint < 0x10000)
         str[0] = (U16)codepoint;
