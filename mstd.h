@@ -167,32 +167,6 @@
 #define unreachable()
 #endif
 
-/* Units */
-#define BIT(x) (1ULL << (x))
-#define bit(x) (1ULL << (x))
-#define KB(n) (((U64)(n)) << 10)
-#define MB(n) (((U64)(n)) << 20)
-#define GB(n) (((U64)(n)) << 30)
-#define TB(n) (((U64)(n)) << 40)
-
-/* Bit Ops */
-#define bit_unset(val, index) ((val) &= ~bit(index))
-#define bit_set(val, index) ((val) |= bit(index))
-#define bit_toggle(val, index) ((val) ^= bit(index))
-#define bit_is_set(val, index) (((val) >> (index)) & 1ULL)
-
-/* pow2 math */
-#define is_pow2(x) ((x) != 0 && (((x) & ((x) - 1)) == 0))
-#define is_pow2_or_zero(x) (((x) & ((x) - 1)) == 0)
-
-#define align_up_pow2(x, p) (((x) + ((p) - 1)) & ~((p) - 1))
-#define align_down_pow2(x, p) ((x) & ~((p) - 1))
-
-/* Clamp */
-#define clamp_top(val, high) (((val) < (high)) ? (val) : (high))
-#define clamp_bottom(val, low) (((val) > (low)) ? (val) : (low))
-#define clamp(val, low, high) (clamp_bottom(low, clamp_top(val, high)))
-
 /* Alignment */
 #if COMPILER_MSVC
 #define align_of(T) __alignof(T)
@@ -211,6 +185,25 @@
 #else
 #error align_to not defined for this compiler.
 #endif
+
+/* Clamp */
+#define clamp_top(val, high) (((val) < (high)) ? (val) : (high))
+#define clamp_bottom(val, low) (((val) > (low)) ? (val) : (low))
+#define clamp(val, low, high) (clamp_bottom(low, clamp_top(val, high)))
+
+/* bit */
+
+#define BIT(x) (1ULL << (x))
+#define bit(x) BIT(x)
+#define KB(n) (((U64)(n)) << 10)
+#define MB(n) (((U64)(n)) << 20)
+#define GB(n) (((U64)(n)) << 30)
+#define TB(n) (((U64)(n)) << 40)
+
+#define bit_unset(val, index) ((val) &= ~bit(index))
+#define bit_set(val, index) ((val) |= bit(index))
+#define bit_toggle(val, index) ((val) ^= bit(index))
+#define bit_is_set(val, index) (((val) >> (index)) & 1ULL)
 
 /* Misc */
 #define symbol_to_cstr_(S) #S
@@ -445,6 +438,21 @@ int memcmp(const void* buffer1, const void* buffer2, size_t count);
 #define mem_commit os_memory_commit /* requires initialized os state. */
 #define mem_decommit os_memory_decommit /* requires initialized os state. */
 #define mem_release os_memory_release /* requires initialized os state. */
+
+/* math */
+
+#define NUM_PI 3.14159265358979323846
+
+#define num_degree_to_radian(a) NUM_PI / 180.0f * (a)
+#define num_radian_to_degree(a) 180.0f / NUM_PI * (a)
+#define num_is_pow2(x) ((x) != 0 && (((x) & ((x) - 1)) == 0))
+#define num_is_pow2_or_zero(x) (((x) & ((x) - 1)) == 0)
+
+#define is_pow2(x) ((x) != 0 && (((x) & ((x) - 1)) == 0))
+#define is_pow2_or_zero(x) (((x) & ((x) - 1)) == 0)
+
+#define align_up_pow2(x, p) (((x) + ((p) - 1)) & ~((p) - 1))
+#define align_down_pow2(x, p) ((x) & ~((p) - 1))
 
 /* Arena */
 typedef struct ArenaTempNode {
