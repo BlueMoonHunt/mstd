@@ -956,17 +956,17 @@ struct DArrayHeader {
     U64 size;
 };
 
-#define darray_tag                                                                                                     \
-    union {                                                                                                            \
-        U64 size;                                                                                                      \
-        DArrayHeader header;                                                                                           \
+#define darray_tag           \
+    union {                  \
+        U64 size;            \
+        DArrayHeader header; \
     };
 
 typedef struct DArrayMetaData DArrayMetaData;
 struct DArrayMetaData {
     U8 shift;
     U8 chunks_max;
-    U32 el_size;
+    U32 element_size;
 };
 
 internal force_inline void* darray_handle(Arena* arena, DArrayHeader* header, DArrayMetaData meta, U64 index);

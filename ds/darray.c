@@ -1,27 +1,27 @@
 internal force_inline void* darray_handle(Arena* arena, DArrayHeader* header, DArrayMetaData meta, U64 index) {
-    U8** chunks;
-    U64 i_shift;
-    I8 chunks_i;
+    U8** chunk_ptrs;
+    I8 chunk_index;
+    U64 chunk_capacity;
+    U64 chunk_start_index;
     I8 i;
-    U64 base;
 
-    chunks = (U8**)(header + 1);
-    i_shift = index >> meta.shift;
-    chunks_i = u64_msb(i_shift + 1);
+    chunk_ptrs = (U8**)(header + 1);
+    chunk_index = (I8)u64_msb((index >> meta.shift) + 1);
 
-    if (arena && chunks_i < meta.chunks_max) {
-        for (i = 0; i <= chunks_i; ++i) {
-            if (chunks[i] == 0) {
-                U64 tier_size = 1ULL << clamp_top((i + meta.shift), 63);
-                chunks[i] = (U8*)arena_push(arena, tier_size * meta.el_size, 8);
+    if (arena && chunk_index < (I8)meta.chunks_max) {
+        for (i = 0; i <= chunk_index; i++) {
+            if (chunk_ptrs[i] == 0) {
+                chunk_capacity = 1ULL << clamp_top(i + meta.shift, 63);
+                chunk_ptrs[i] = (U8*)arena_push(arena, chunk_capacity * meta.element_size, 8);
+                header->size += chunk_capacity;
             }
         }
     }
 
-    if (chunks_i > 0) {
-        base = (1ULL << (chunks_i + meta.shift)) - (1ULL << meta.shift);
-        index -= base;
+    if (chunk_index > 0) {
+        chunk_start_index = (1ULL << (chunk_index + meta.shift)) - (1ULL << meta.shift);
+        index -= chunk_start_index;
     }
 
-    return chunks[chunks_i] + (index * meta.el_size);
+    return chunk_ptrs[chunk_index] + (index * meta.element_size);
 }
