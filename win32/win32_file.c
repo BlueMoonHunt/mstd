@@ -118,7 +118,7 @@ internal Handle os_file_open(Str8 name, FileAccessFlag flags) {
     return result;
 }
 
-internal U64 os_file_size(Handle handle) {
+internal U64 os_file_get_size(Handle handle) {
     U64 size = 0;
     GetFileSizeEx((HANDLE)handle.val[0], (LARGE_INTEGER *)&size);
     return size;
@@ -132,7 +132,6 @@ internal Str8 os_file_read(Arena *arena, Handle handle, U64 offset, U64 size) {
     DWORD actual_read;
     U64 total_read_size;
     Str8 str;
-    HANDLE file;
     U64 _size;
     U64 _offset;
     U64 total_to_read;
@@ -142,11 +141,10 @@ internal Str8 os_file_read(Arena *arena, Handle handle, U64 offset, U64 size) {
     total_read_size = 0;
     str.data = 0;
     str.size = 0;
+    _size = 0;
 
     if (handle.val[0]) {
-        file = (HANDLE)handle.val[0];
-        _size = 0;
-        GetFileSizeEx(file, (LARGE_INTEGER *)&_size);
+        GetFileSizeEx((HANDLE)handle.val[0], (LARGE_INTEGER *)&_size);
 
         total_to_read = clamp_top(size, _size);
         out = arena_push_array(arena, U8, total_to_read + 1);
@@ -159,7 +157,7 @@ internal Str8 os_file_read(Arena *arena, Handle handle, U64 offset, U64 size) {
             overlapped.Offset = (DWORD)(_offset & U32_MAX);
             overlapped.OffsetHigh = (DWORD)(_offset >> 32);
 
-            if (ReadFile(file, (U8 *)out + total_read_size, to_read, &actual_read, &overlapped)) {
+            if (ReadFile((HANDLE)handle.val[0], (U8 *)out + total_read_size, to_read, &actual_read, &overlapped)) {
                 _offset += actual_read;
                 total_read_size += actual_read;
                 if (actual_read < to_read)
@@ -272,7 +270,7 @@ internal FileEvent *os_file_watcher_poll_events(FileWatcher *watcher, Arena *are
                 u16_file.data = notify->FileName;
                 u16_file.size = name_len_chars;
 
-                result_array[i].file_name = str8_from_16(arena, u16_file);
+                result_array[i].file_name = str8_from_str16(arena, u16_file);
                 switch (notify->Action) {
                 case FILE_ACTION_ADDED:
                 case FILE_ACTION_RENAMED_NEW_NAME:
@@ -298,7 +296,7 @@ internal FileEvent *os_file_watcher_poll_events(FileWatcher *watcher, Arena *are
             }
         }
 
-        mem_zero_struct(&watcher->overlapped);
+        mem_zero_type(&watcher->overlapped);
         ReadDirectoryChangesW(watcher->dir_handle, watcher->notification_buffer, sizeof(watcher->notification_buffer),
                               watcher->scan_sub_directories,
                               FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME |

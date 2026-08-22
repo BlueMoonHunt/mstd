@@ -20,7 +20,7 @@ internal Str8 os_get_current_working_directory(Arena* arena) {
     Str16 path16 = {0};
     path16.data = arena_push_array(scratch, U16, length);
     path16.size = GetCurrentDirectoryW(length, (WCHAR*)path16.data);
-    path = str8_from_16(arena, path16);
+    path = str8_from_str16(arena, path16);
 
     arena_scratch_end(scratch);
 
@@ -58,7 +58,7 @@ internal void os_state_init(void) {
     buffer_size = KB(32);
     path = arena_push_array(scratch, U16, buffer_size);
     path_length = GetModuleFileNameW(0, path, buffer_size);
-    bin_path = str8_from_16(scratch, (Str16){.size = path_length, .data = path});
+    bin_path = str8_from_str16(scratch, (Str16){.size = path_length, .data = path});
 
     os_state.process_info.bin_path                   = str8_copy(os_state.arena, bin_path);
     os_state.process_info.id                         = GetCurrentProcessId();

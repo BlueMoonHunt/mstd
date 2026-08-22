@@ -384,23 +384,11 @@ internal force_inline I8 u64_lsb(U64 x);
 
 #endif
 
+/* Memory */
+
 typedef struct Handle {
     U64 val[1];
 } Handle;
-
-/* Memory */
-
-typedef struct Buffer Buffer;
-struct Buffer {
-    U8* data;
-    U64 size;
-};
-
-typedef struct Buffer_RO Buffer_RO;
-struct Buffer_RO {
-    const U8* data;
-    U64 size;
-};
 
 #if COMPILER_MSVC
 void* memmove(void* dest, const void* src, size_t count);
@@ -424,13 +412,13 @@ int memcmp(const void* buffer1, const void* buffer2, size_t count);
 #endif
 
 #define mem_zero(mem, size) mem_set((mem), 0, (size))
-#define mem_zero_struct(mem) mem_zero((mem), sizeof(*(mem)))
+#define mem_zero_type(mem) mem_zero((mem), sizeof(*(mem)))
 #define mem_zero_array(mem, count) mem_zero((mem), sizeof(*(mem)) * (count))
 
 #define mem_copy_type(dest, src) mem_copy((dest), (src), sizeof(*(dest)))
 #define mem_copy_array(dest, src, count) mem_copy((dest), (src), sizeof(*(dest)) * (count))
 
-#define mem_move_struct(dest, src) mem_move((dest), (src), sizeof(*(dest)))
+#define mem_move_type(dest, src) mem_move((dest), (src), sizeof(*(dest)))
 #define mem_move_array(dest, src, count) mem_move((dest), (src), sizeof(*(dest)) * (count))
 
 
@@ -458,7 +446,7 @@ int memcmp(const void* buffer1, const void* buffer2, size_t count);
 typedef struct ArenaTempNode {
     U64 cursor;
     struct ArenaTempNode* next;
-} ArenaTempNode;
+    } ArenaTempNode;
 
 typedef struct Arena {
     U64 cursor;
@@ -638,9 +626,9 @@ align_to(64) global const U8 ASCII_LUT[256] = {
 
 internal Str8 str8_from_cstr(char* str);
 internal Str8 str8_from_fmt(Arena* arena, char* fmt, ...);
-internal Str8 str8_from_16(Arena* arena, Str16 str);
-internal Str8 str8_from_32(Arena* arena, Str32 str);
-internal Str8 str8_from_mem_size(Arena* arena, U64 size);
+internal Str8 str8_from_str16(Arena* arena, Str16 str);
+internal Str8 str8_from_str32(Arena* arena, Str32 str);
+internal Str8 str8_from_size(Arena* arena, U64 size);
 internal Str8 str8_from_slice(Arena* arena, Str8Slice slice);
 
 /* String Matching */
@@ -659,15 +647,18 @@ internal U64 str8_find_reverse(Str8 target, Str8 query, U64 offset, enum_val(Str
 internal Str8 str8_concat(Arena* arena, Str8 a, Str8 b);
 internal Str8 str8_concat_n_(Arena* arena, ...);
 
-#define str8_concat_n(arena, ...) str8_concat_n_(arena, __VA_ARGS__, (Str8){.size = NPOS})
+#define str8_concat_n(arena, ...) str8_concat_n_(arena, __VA_ARGS__, (Str8){0})
 
 internal Str8 str8_copy(Arena* arena, Str8 str);
 internal char* str8_copy_to_cstr(Arena* arena, Str8 str);
 
 /* String slicing */
-internal Str8Slice str8_slice(Str8Slice str, U64 pos, U8 give_postfix);
-internal Str8Slice str8_slice_head_until(Str8Slice str, Str8 delimiter, U8 give_postfix);
-internal Str8Slice str8_slice_tail_until(Str8Slice str, Str8 delimiter, U8 give_postfix);
+internal Str8Slice str8_slice(Str8Slice str, U64 begin, U64 end);
+
+#define str8_slice_from_str8(str, begin, end) str8_slice((Str8Slice)str, begin, end)
+#define str8_slice_match(a, b, flags) str8_match((Str8)a, (Str8)b, flags)
+#define str8_slice_find(target, query, offset, flags) str8_find((Str8)target, (Str8)query, offset, flags)
+#define str8_slice_find_reverse(target, query, offset, flags) str8_find_reverse((Str8)target, (Str8)query, offset, flags)
 
 typedef struct Str16 {
     U16* data;
@@ -834,7 +825,7 @@ internal U32 os_file_exists(Str8 path);
 internal U32 os_file_directory_exists(Str8 path);
 
 internal Handle os_file_open(Str8 name, FileAccessFlag flags);
-internal U64 os_file_size(Handle handle);
+internal U64 os_file_get_size(Handle handle);
 internal void os_file_close(Handle handle);
 internal Str8 os_file_read(Arena* arena, Handle handle, U64 offset, U64 size);
 internal void os_file_write(Handle handle, void* data, U64 offset, U64 size);
@@ -848,8 +839,9 @@ internal void os_file_write(Handle handle, void* data, U64 offset, U64 size);
 
 #define file_open os_file_open
 #define file_close os_file_close
-#define file_size os_file_size
+#define file_get_size os_file_get_size
 #define file_read(arena, handle) os_file_read(arena, handle, 0, NPOS)
+#define file_read_ex(arena, handle, offset, size) os_file_read(arena, handle, offset, size)
 #define file_read_struct(arena, handle, T, offset) (T*)os_file_read(arena, handle, sizeof(T), offset)
 
 #define file_write(handle, data) os_file_write(handle, data, 0, NPOS)
@@ -857,7 +849,6 @@ internal void os_file_write(Handle handle, void* data, U64 offset, U64 size);
 #define file_write_string(handle, str) os_file_write(handle, str.data, 0, str.size)
 
 /* FileWatcher */
-
 typedef enum FileEventType {
     FILE_EVENT_TYPE_NULL,
     FILE_EVENT_TYPE_MODIFIED,

@@ -1,4 +1,4 @@
-internal Str8 str8_from_16(Arena* arena, Str16 str) {
+internal Str8 str8_from_str16(Arena* arena, Str16 str) {
     U16* ptr;
     U16* opl;
     U64 size;
@@ -34,7 +34,7 @@ internal Str8 str8_from_16(Arena* arena, Str16 str) {
     return result;
 }
 
-internal Str8 str8_from_32(Arena* arena, Str32 str) {
+internal Str8 str8_from_str32(Arena* arena, Str32 str) {
     Str8 result;
     U32* opl;
     U32* ptr;
@@ -75,7 +75,7 @@ internal Str8 str8_from_cstr(char* str) {
     return result;
 }
 
-internal Str8 str8_from_mem_size(Arena* arena, U64 size) {
+internal Str8 str8_from_size(Arena* arena, U64 size) {
     Str8 result;
 
     result.data = arena_push_array(arena, U8, size + 1);
@@ -100,7 +100,7 @@ internal Str8 str8_from_fmt(Arena* arena, char* fmt, ...) {
     va_end(args_copy);
 
     if (length) {
-        result = str8_from_mem_size(arena, length);
+        result = str8_from_size(arena, length);
         vsnprintf((char*)result.data, result.size + 1, fmt, args);
         result.data[result.size] = 0;
     }
@@ -233,7 +233,7 @@ internal U64 str8_find_reverse(Str8 target, Str8 query, U64 offset, enum_val(Str
 }
 
 internal Str8 str8_concat(Arena* arena, Str8 a, Str8 b) {
-    Str8 result = str8_from_mem_size(arena, a.size + b.size);
+    Str8 result = str8_from_size(arena, a.size + b.size);
 
     mem_copy(result.data, a.data, a.size);
     mem_copy(result.data + a.size, b.data, b.size);
@@ -276,7 +276,7 @@ internal Str8 str8_concat_n_(Arena* arena, ...) {
 internal Str8 str8_copy(Arena *arena, Str8 str) {
     Str8 target;
 
-    target = str8_from_mem_size(arena, str.size);
+    target = str8_from_size(arena, str.size);
     mem_copy_array(target.data, str.data, str.size);
     target.data[target.size] = 0;
 
@@ -293,68 +293,15 @@ internal char *str8_copy_to_cstr(Arena *arena, Str8 str) {
     return target;
 }
 
-internal Str8Slice str8_slice(Str8Slice str, U64 pos, U8 give_postfix) {
-    pos = clamp_top(pos, str.size);
+internal Str8Slice str8_slice(Str8Slice slice, U64 begin, U64 end) {
+    Str8Slice result;
 
-    if (give_postfix) {
-        str.data += pos;
-        str.size -= pos;
-    }
-    else {
-        str.size = pos;
-    }
+    mem_set(&result, 0, sizeof result);
 
-    return str;
-}
-
-internal Str8Slice str8_slice_head_until(Str8Slice str, Str8 delimiter, U8 give_postfix) {
-    U64 i;
-    U8 delimiter_lookup[256];
-
-    mem_set(delimiter_lookup, 0, sizeof(delimiter_lookup));
-
-    for (i = 0; i < delimiter.size; i++) {
-        delimiter_lookup[delimiter.data[i]] = 1;
+    if (begin <= end && end <= slice.size) {
+        result.data = slice.data + begin;
+        result.size = end - begin;
     }
 
-    for (i = 0; i < str.size && !delimiter_lookup[str.data[i]]; i++);
-
-    if (give_postfix) {
-        if (i < str.size)
-            i++;
-
-        str.data += i;
-        str.size -= i;
-    }
-    else {
-        str.size = i;
-    }
-
-    return str;
-}
-
-internal Str8Slice str8_slice_tail_until(Str8Slice str, Str8 delimiter, U8 give_postfix) {
-    U64 i;
-    U8 delimiter_lookup[256];
-
-    mem_set(delimiter_lookup, 0, sizeof(delimiter_lookup));
-
-    for (i = 0; i < delimiter.size; i++) {
-        delimiter_lookup[delimiter.data[i]] = 1;
-    }
-
-    for (i = str.size; i > 0 && !delimiter_lookup[str.data[i - 1]]; i--);
-
-    if (give_postfix) {
-        str.data += i;
-        str.size -= i;
-    }
-    else {
-        if (i > 0)
-            i--;
-
-        str.size = i;
-    }
-
-    return str;
+    return result;
 }

@@ -21,7 +21,7 @@ internal void os_cmd_line_args(Arena* arena, I32* argc, Str8** argv) {
     *argc = count;
 
     for (i = 0; i < count; i++) {
-        *argv[i] = str8_from_16(arena, str16(args[i]));
+        *argv[i] = str8_from_str16(arena, str16(args[i]));
     }
 
     LocalFree(args);
