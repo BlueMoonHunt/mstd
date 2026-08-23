@@ -10,7 +10,7 @@ internal Str16 str16_from_cstr(U16* str) {
     return result;
 }
 
-internal Str16 str16_from_8(Arena* arena, Str8 str) {
+internal Str16 str16_from_str8(Arena* arena, Str8 str) {
     Str16 result;
     U8 *ptr;
     U8 *opl;

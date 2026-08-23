@@ -670,7 +670,7 @@ typedef struct Str16 {
 #define str16(S) str16_from_cstr(S)
 
 internal Str16 str16_from_cstr(U16* str);
-internal Str16 str16_from_8(Arena* arena, Str8 str);
+internal Str16 str16_from_str8(Arena* arena, Str8 str);
 internal Str16 str16_from_mem_size(Arena* arena, U64 size);
 
 typedef struct Str32 {
@@ -683,7 +683,7 @@ typedef struct Str32 {
 #define str32(S) str32_from_cstr(S)
 
 internal Str32 str32_from_cstr(U32* str);
-internal Str32 str32_from_8(Arena* arena, Str8 str);
+internal Str32 str32_from_str8(Arena* arena, Str8 str);
 internal Str32 str32_from_mem_size(Arena* arena, U64 size);
 
 /* OS State */

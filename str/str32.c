@@ -10,7 +10,7 @@ internal Str32 str32_from_cstr(U32* str) {
     return result;
 }
 
-internal Str32 str32_from_8(Arena* arena, Str8 str) {
+internal Str32 str32_from_str8(Arena* arena, Str8 str) {
     Str32 result;
     U8* ptr;
     U8* opl;
