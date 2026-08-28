@@ -104,8 +104,6 @@
 
 #if OS_WINDOWS
 #define WIN32_LEAN_AND_MEAN
-#define NOGDI
-#define NOUSER
 #include <Windows.h>
 #include <shellapi.h>
 #endif
