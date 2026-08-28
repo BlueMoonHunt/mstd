@@ -191,6 +191,9 @@
 #define clamp_bottom(val, low) (((val) > (low)) ? (val) : (low))
 #define clamp(val, low, high) (clamp_bottom(low, clamp_top(val, high)))
 
+/* loop helpers */
+#define for_each_element(index, count) for ((index) = 0; (index) < (count); (index)++)
+
 /* bit */
 
 #define BIT(x) (1ULL << (x))
@@ -441,6 +444,111 @@ int memcmp(const void* buffer1, const void* buffer2, size_t count);
 
 #define align_up_pow2(x, p) (((x) + ((p) - 1)) & ~((p) - 1))
 #define align_down_pow2(x, p) ((x) & ~((p) - 1))
+
+/* vector */
+
+#define DEFINE_VEC2(type)             \
+    typedef union type##Vec2 {        \
+        type raw[2];                  \
+        struct { type x, y; };        \
+        struct { type r, g; };        \
+        struct { type width, height; }; \
+    } type##Vec2;
+
+#define DEFINE_VEC3(type)             \
+    typedef union type##Vec3 {        \
+        type raw[3];                  \
+        struct { type x, y, z; };     \
+        struct { type r, g, b; };     \
+    } type##Vec3;
+
+#define DEFINE_VEC4(type)             \
+    typedef union type##Vec4 {        \
+        type raw[4];                  \
+        struct { type x, y, z, w; };  \
+        struct { type r, g, b, a; };  \
+    } type##Vec4;
+
+#define DEFINE_VEC_ALL(type)          \
+    DEFINE_VEC2(type)                 \
+    DEFINE_VEC3(type)                 \
+    DEFINE_VEC4(type)
+
+DEFINE_VEC_ALL(I8)
+DEFINE_VEC_ALL(I16)
+DEFINE_VEC_ALL(I32)
+DEFINE_VEC_ALL(I64)
+
+DEFINE_VEC_ALL(U8)
+DEFINE_VEC_ALL(U16)
+DEFINE_VEC_ALL(U32)
+DEFINE_VEC_ALL(U64)
+
+DEFINE_VEC_ALL(F32)
+DEFINE_VEC_ALL(F64)
+
+/* matrices */
+
+#define DEFINE_MAT2(type)                                      \
+    typedef union type##Mat2 {                                 \
+        type raw[4];                                           \
+        type m[2][2];                                          \
+        type##Vec2 cols[2];                                    \
+        type##Vec2 rows[2];                                    \
+        struct {                                               \
+            type m00, m01;                                     \
+            type m10, m11;                                     \
+        };                                                     \
+    } type##Mat2;
+
+#define DEFINE_MAT3(type)                                      \
+    typedef union type##Mat3 {                                 \
+        type raw[9];                                           \
+        type m[3][3];                                          \
+        type##Vec3 cols[3];                                    \
+        type##Vec3 rows[3];                                    \
+        struct {                                               \
+            type m00, m01, m02;                                \
+            type m10, m11, m12;                                \
+            type m20, m21, m22;                                \
+        };                                                     \
+    } type##Mat3;
+
+#define DEFINE_MAT4(type)                                      \
+    typedef union type##Mat4 {                                 \
+        type raw[16];                                          \
+        type m[4][4];                                          \
+        type##Vec4 cols[4];                                    \
+        type##Vec4 rows[4];                                    \
+        struct {                                               \
+            type m00, m01, m02, m03;                            \
+            type m10, m11, m12, m13;                            \
+            type m20, m21, m22, m23;                            \
+            type m30, m31, m32, m33;                            \
+        };                                                     \
+    } type##Mat4;
+
+#define DEFINE_MAT_ALL(type)                                   \
+    DEFINE_MAT2(type)                                          \
+    DEFINE_MAT3(type)                                          \
+    DEFINE_MAT4(type)
+
+#define DEFINE_MATH_ALL(type)                                  \
+    DEFINE_VEC_ALL(type)                                       \
+    DEFINE_MAT_ALL(type)
+
+DEFINE_MATH_ALL(I8)
+DEFINE_MATH_ALL(I16)
+DEFINE_MATH_ALL(I32)
+DEFINE_MATH_ALL(I64)
+
+DEFINE_MATH_ALL(U8)
+DEFINE_MATH_ALL(U16)
+DEFINE_MATH_ALL(U32)
+DEFINE_MATH_ALL(U64)
+
+DEFINE_MATH_ALL(F32)
+DEFINE_MATH_ALL(F64)
 
 /* Arena */
 typedef struct ArenaTempNode {

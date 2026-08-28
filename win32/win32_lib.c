@@ -4,7 +4,7 @@ internal Handle os_lib_load(Str8 name) {
     Arena* scratch;
 
     arena_scratch_scope(scratch) {
-        name16 = str16_from_8(scratch, name);
+        name16 = str16_from_str8(scratch, name);
         HMODULE mod = LoadLibraryW((LPWSTR)name16.data);
         handle.val[0] = (U64)mod;
     }

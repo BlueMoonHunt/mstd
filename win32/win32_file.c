@@ -82,7 +82,7 @@ internal U32 os_file_directory_exists(Str8 path) {
 internal Handle os_file_open(Str8 name, FileAccessFlag flags) {
     Handle result = {0};
     Arena *arena = arena_scratch_begin();
-    Str16 path_w32 = str16_from_8(arena, name);
+    Str16 path_w32 = str16_from_str8(arena, name);
     DWORD access_flags = 0;
     DWORD share_mode = 0;
     DWORD creation_disposition = OPEN_EXISTING;
@@ -214,7 +214,7 @@ internal FileWatcher *os_file_watcher_create(Arena *arena, Str8 path, U32 watch_
     struct Win32FileWatcher watcher;
 
     scratch = arena_scratch_begin();
-    u16_path = str16_from_8(scratch, path);
+    u16_path = str16_from_str8(scratch, path);
 
     dir = CreateFileW((LPCWSTR)u16_path.data, FILE_LIST_DIRECTORY, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                     NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
