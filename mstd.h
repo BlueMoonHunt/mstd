@@ -104,6 +104,8 @@
 
 #if OS_WINDOWS
 #define WIN32_LEAN_AND_MEAN
+#define NOGDI
+#define NOUSER
 #include <Windows.h>
 #include <shellapi.h>
 #endif
@@ -533,22 +535,18 @@ DEFINE_VEC_ALL(F64)
     DEFINE_MAT3(type)                                          \
     DEFINE_MAT4(type)
 
-#define DEFINE_MATH_ALL(type)                                  \
-    DEFINE_VEC_ALL(type)                                       \
-    DEFINE_MAT_ALL(type)
+DEFINE_MAT_ALL(I8)
+DEFINE_MAT_ALL(I16)
+DEFINE_MAT_ALL(I32)
+DEFINE_MAT_ALL(I64)
 
-DEFINE_MATH_ALL(I8)
-DEFINE_MATH_ALL(I16)
-DEFINE_MATH_ALL(I32)
-DEFINE_MATH_ALL(I64)
+DEFINE_MAT_ALL(U8)
+DEFINE_MAT_ALL(U16)
+DEFINE_MAT_ALL(U32)
+DEFINE_MAT_ALL(U64)
 
-DEFINE_MATH_ALL(U8)
-DEFINE_MATH_ALL(U16)
-DEFINE_MATH_ALL(U32)
-DEFINE_MATH_ALL(U64)
-
-DEFINE_MATH_ALL(F32)
-DEFINE_MATH_ALL(F64)
+DEFINE_MAT_ALL(F32)
+DEFINE_MAT_ALL(F64)
 
 /* Arena */
 typedef struct ArenaTempNode {
