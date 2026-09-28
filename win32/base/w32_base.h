@@ -7,6 +7,7 @@
 #pragma comment(lib, "user32")
 #pragma comment(lib, "shell32")
 
+#define W32_WINDOW_CLASS L"W32_WINDOW_CLASS"
 #define W32_FILE_WATCHER_NOTIFICATION_BUFFER_SIZE KB(8)
 
 typedef struct W32_FileWatcher W32_FileWatcher;
@@ -70,5 +71,7 @@ internal void w32_entity_release(W32_Entity* entity);
 internal DWORD w32_thread_entrypoint(void* ptr);
 
 internal U32 w32_sleep_ms_from_end_us(U64 end_us);
+
+internal void w32_class_create(void);
 
 #endif /* W32_BASE_H */

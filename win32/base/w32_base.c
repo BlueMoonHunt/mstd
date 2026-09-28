@@ -74,7 +74,26 @@ internal void w32_process_info_fetch(void) {
     arena_scratch_release(scratch);
 }
 
-internal void os_state_init(void) {
+LRESULT CALLBACK w32_message_callback(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+internal void w32_class_create(void) {
+    WNDCLASSEXW w32_class;
+    HINSTANCE instance;
+
+    instance = GetModuleHandleW(0);
+
+    mem_zero_type(&w32_class);
+    w32_class.hInstance     = instance;
+    w32_class.lpszClassName = W32_WINDOW_CLASS;
+    w32_class.cbSize        = sizeof w32_class;
+    w32_class.lpfnWndProc   = w32_message_callback;
+    w32_class.style         = CS_HREDRAW | CS_VREDRAW;
+    w32_class.hCursor       = LoadCursorW(instance, IDC_ARROW);
+
+    RegisterClassExW(&w32_class);
+}
+
+internal void os_state_init_(OS_StateParam* params) {
     SYSTEM_INFO sys_info;
     LARGE_INTEGER resolution;
     Arena* scratch;
@@ -111,6 +130,10 @@ internal void os_state_init(void) {
 
     InitializeCriticalSection(&w32_state.entity_mutex);
 
+    if (params->flags) {
+        w32_class_create();
+    }
+
     arena_scratch_release(scratch);
 }
 
@@ -132,7 +155,7 @@ internal W32_Entity* w32_entity_alloc(W32_EntityType type) {
     entity = w32_state.entity_stack_head;
 
     if (entity)
-        sll_stack_pop(w32_state.entity_stack_head, w32_state.entity_stack_tail);
+        sll_stack_pop_ht(w32_state.entity_stack_head, w32_state.entity_stack_tail);
     else
         entity = arena_push_type(w32_state.arena, W32_Entity);
 
@@ -145,7 +168,7 @@ internal W32_Entity* w32_entity_alloc(W32_EntityType type) {
 internal void w32_entity_release(W32_Entity* entity) {
     entity->type = W32_ENTITY_TYPE_UNKNOWN;
     EnterCriticalSection(&w32_state.entity_mutex);
-    sll_stack_push(w32_state.entity_stack_head, w32_state.entity_stack_tail, entity);
+    sll_stack_push_ht(w32_state.entity_stack_head, w32_state.entity_stack_tail, entity);
     LeaveCriticalSection(&w32_state.entity_mutex);
 }
 
@@ -881,7 +904,7 @@ internal U32 w32_sleep_ms_from_end_us(U64 end_us) {
 
 /* Lib */
 
-internal Handle lib_load(const char* lib_name) {
+internal Handle lib_load_(Str8 lib_name) {
     Handle handle;
     Str16 name16;
     Arena* arena;
@@ -894,10 +917,10 @@ internal Handle lib_load(const char* lib_name) {
     return handle;
 }
 
-internal void* lib_symbol_get(Handle lib, const char* symbol_name_cstr) {
-    return (void *)GetProcAddress((HMODULE)lib.val[0], (LPCSTR)symbol_name_cstr);
+internal void* lib_symbol_get_(Handle lib, Str8 symbol_name) {
+    return (void *)GetProcAddress((HMODULE)lib.val[0], (LPCSTR)symbol_name.data);
 }
 
 internal void lib_unload(Handle lib) {
-    FreeLibrary((HMODULE)handle.val[0]);
+    FreeLibrary((HMODULE)lib.val[0]);
 }

@@ -1,4 +1,4 @@
-internal VArray* varray_create(U64 theoratical_capacity, U64 initial_size, U32 element_size, U32 element_alignment) {
+internal VArray* varray_create_(U64 theoratical_capacity, U64 initial_size, U32 element_size, U32 element_alignment) {
     U64 page_size;
     U64 reserve;
     U64 commit;

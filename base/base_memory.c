@@ -89,13 +89,13 @@ internal void arena_temp_begin(Arena *arena) {
     node = arena_push_type(arena, ArenaTemp);
     node->cursor = cursor;
 
-    sll_stack_push(arena->temp_stack_head, arena->temp_stack_tail, node);
+    sll_stack_push_ht(arena->temp_stack_head, arena->temp_stack_tail, node);
 }
 
 internal void arena_temp_release(Arena *arena) {
     if (arena->temp_stack_head) {
         arena->cursor = arena->temp_stack_head->cursor;
-        sll_stack_pop(arena->temp_stack_head, arena->temp_stack_tail);
+        sll_stack_pop_ht(arena->temp_stack_head, arena->temp_stack_tail);
     }
 }
 
