@@ -35,23 +35,10 @@ struct ProcessInfo {
     Str8 current_working_directory;
 };
 
-typedef U32 OS_StateFlag;
-
-enum {
-    OS_STATE_FLAG_NONE,
-    OS_STATE_FLAG_VIDEO,
-};
-
-typedef struct OS_StateParam OS_StateParam;
-struct OS_StateParam {
-    OS_StateFlag flags;
-};
-
 internal SystemInfo* system_info(void);
 internal ProcessInfo* process_info(void);
 
-internal void os_state_init_(OS_StateParam* params);
-#define os_state_init(...) os_state_init_(&(OS_StateParam){.flags = 0, __VA_ARGS__})
+internal void os_state_init();
 
 internal Handle lib_load_(Str8 lib_name);
 internal void* lib_symbol_get_(Handle lib, Str8 symbol_name);

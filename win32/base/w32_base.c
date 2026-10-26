@@ -76,24 +76,7 @@ internal void w32_process_info_fetch(void) {
 
 LRESULT CALLBACK w32_message_callback(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-internal void w32_class_create(void) {
-    WNDCLASSEXW w32_class;
-    HINSTANCE instance;
-
-    instance = GetModuleHandleW(0);
-
-    mem_zero_type(&w32_class);
-    w32_class.hInstance     = instance;
-    w32_class.lpszClassName = W32_WINDOW_CLASS;
-    w32_class.cbSize        = sizeof w32_class;
-    w32_class.lpfnWndProc   = w32_message_callback;
-    w32_class.style         = CS_HREDRAW | CS_VREDRAW;
-    w32_class.hCursor       = LoadCursorW(instance, IDC_ARROW);
-
-    RegisterClassExW(&w32_class);
-}
-
-internal void os_state_init_(OS_StateParam* params) {
+internal void os_state_init() {
     SYSTEM_INFO sys_info;
     LARGE_INTEGER resolution;
     Arena* scratch;
@@ -129,10 +112,6 @@ internal void os_state_init_(OS_StateParam* params) {
     w32_state.process.current_working_directory  = str8_from_str16(w32_state.arena, path_cwd);
 
     InitializeCriticalSection(&w32_state.entity_mutex);
-
-    if (params->flags) {
-        w32_class_create();
-    }
 
     arena_scratch_release(scratch);
 }
