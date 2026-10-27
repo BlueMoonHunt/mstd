@@ -27,7 +27,7 @@
 #if OS_WINDOWS
 
 #define WIN32_LEAN_AND_MEAN
-#include <win32/base/w32_base.h>
+#include "../win32/base/w32_base.h"
 #endif
 
 #endif /* BASE_H */
