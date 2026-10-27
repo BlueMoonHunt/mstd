@@ -38,7 +38,7 @@ struct ProcessInfo {
 internal SystemInfo* system_info(void);
 internal ProcessInfo* process_info(void);
 
-internal void os_state_init();
+internal void os_state_init(void);
 
 internal Handle lib_load_(Str8 lib_name);
 internal void* lib_symbol_get_(Handle lib, Str8 symbol_name);
