@@ -16,7 +16,7 @@
 
 #include "base_type.h"
 #include "base_memory.h"
-#include "base_array.h"
+#include "base_varray.h"
 #include "base_list.h"
 #include "base_string.h"
 #include "base_state.h"
