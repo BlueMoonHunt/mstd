@@ -1,6 +1,9 @@
 #if !defined(BASE_CORE_H)
 #define BASE_CORE_H
 
+#define CONCAT(a, b) CONCAT_IMPL(a, b)
+#define CONCAT_IMPL(a, b) a ## b
+
 #define clamp_top(val, high) (((val) < (high)) ? (val) : (high))
 #define clamp_bottom(val, low) (((val) > (low)) ? (val) : (low))
 #define clamp(val, low, high) (clamp_bottom(low, clamp_top(val, high)))
@@ -35,6 +38,6 @@
 #define NPOS (U64)(-1)
 #define STRNPOS NPOS
 
-#define for_each_index(i, n) for (i = 0; i < n; i++)
+#define for_each_index(i, n)        for (i = 0; i < n; i++)
 
 #endif /* BASE_CORE_H */

@@ -33,11 +33,14 @@ internal force_inline U8 mem_match(void* mem1, void* mem2, U64 size);
 internal force_inline void mem_copy(void* dest, void* src, U64 size);
 internal force_inline void mem_set(void* mem, U8 byte, U64 size);
 
-#define mem_zero(mem, size)                 mem_set(mem, 0, size)
-#define mem_zero_type(mem)                  mem_set(mem, 0, sizeof(*(mem)))
-#define mem_zero_array(mem, count)          mem_set(mem, 0, sizeof(*(mem)) * (count))
-#define mem_copy_type(dest, src)            mem_copy(dest, src, sizeof(*(dest)))
-#define mem_copy_array(dest, src, count)    mem_copy(dest, src, sizeof(*(dest)) * (count))
+#define mem_zero(mem, size)                 mem_set((mem), 0, (size))
+#define mem_zero_type(mem)                  mem_set((mem), 0, sizeof(*(mem)))
+#define mem_zero_array(mem, count)          mem_set((mem), 0, sizeof(*(mem)) * (count))
+#define mem_copy_type(dest, src)            mem_copy((dest), (src), sizeof(*(dest)))
+#define mem_copy_array(dest, src, count)    mem_copy((dest), (src), sizeof(*(dest)) * (count))
+
+internal U64 mem_write_wrapped(U8* ring_base, U64 ring_size, U64 write_pos, U8* src, U64 src_size);
+internal U64 mem_read_wrapped(U8* ring_base, U64 ring_size, U64 read_pos, U8* dest, U64 dest_size);
 
 /* Arena Allocator */
 
@@ -47,7 +50,14 @@ enum {
     ARENA_FLAG_NONE,
 
     ARENA_FLAG_FORCE_ALIGNMENT_BIT  = 8,
+    ARENA_FLAG_LARGE_PAGES_BIT      = 9,
+    ARENA_FLAG_SCRATCH_BIT          = 10,
+    ARENA_FLAG_INTERNAL_BIT         = 11,
+
     ARENA_FLAG_FORCE_ALIGNMENT      = bit(ARENA_FLAG_FORCE_ALIGNMENT_BIT),
+    ARENA_FLAG_LARGE_PAGES          = bit(ARENA_FLAG_LARGE_PAGES_BIT),
+    ARENA_FLAG_SCRATCH              = bit(ARENA_FLAG_SCRATCH_BIT),
+    ARENA_FLAG_INTERNAL             = bit(ARENA_FLAG_INTERNAL_BIT),
 
     ARENA_FLAG_FORCE_ALIGNMENT_1    = ARENA_FLAG_FORCE_ALIGNMENT | bit(0),
     ARENA_FLAG_FORCE_ALIGNMENT_2    = ARENA_FLAG_FORCE_ALIGNMENT | bit(1),
@@ -57,9 +67,6 @@ enum {
     ARENA_FLAG_FORCE_ALIGNMENT_32   = ARENA_FLAG_FORCE_ALIGNMENT | bit(5),
     ARENA_FLAG_FORCE_ALIGNMENT_64   = ARENA_FLAG_FORCE_ALIGNMENT | bit(6),
     ARENA_FLAG_FORCE_ALIGNMENT_128  = ARENA_FLAG_FORCE_ALIGNMENT | bit(7),
-
-    ARENA_FLAG_LARGE_PAGES          = bit(9),
-    ARENA_FLAG_SCRATCH              = bit(10),
 };
 
 typedef struct ArenaTemp ArenaTemp;
@@ -96,6 +103,10 @@ internal void arena_release(Arena* arena);
 internal void arena_reset(Arena* arena);
 internal void* arena_push(Arena* arena, U64 size, U64 alignment);
 
+#define arena_alloc(...) arena_alloc_(&(ArenaParmas){.reserve_size = ARENA_DEFAULT_RESERVE_SIZE, .commit_size = ARENA_DEFAULT_COMMIT_SIZE, .flags = ARENA_FLAG_NONE, __VA_ARGS__})
+#define arena_push_type(arena, T) arena_push(arena, sizeof(T), align_of(T))
+#define arena_push_array(arena, T, count) arena_push(arena, sizeof(T) * count, align_of(T))
+
 internal void arena_temp_alloc(Arena* arena);
 internal void arena_temp_release(Arena* arena);
 internal void arena_temp_release_all(Arena* arena);
@@ -103,9 +114,6 @@ internal void arena_temp_release_all(Arena* arena);
 internal Arena* arena_scratch_alloc_(ArenaParmas* params);
 internal void arena_scratch_release(Arena* scratch_arena);
 
-#define arena_alloc(...)                    arena_alloc_(&(ArenaParmas){.reserve_size = ARENA_DEFAULT_RESERVE_SIZE, .commit_size = ARENA_DEFAULT_COMMIT_SIZE, .flags = ARENA_FLAG_NONE, __VA_ARGS__})
-#define arena_push_type(arena, T)           arena_push(arena, sizeof(T), align_of(T))
-#define arena_push_array(arena, T, count)   arena_push(arena, sizeof(T) * count, align_of(T))
 
 #define arena_scratch_alloc(...)            arena_scratch_alloc_(&(ArenaParmas){.reserve_size = ARENA_DEFAULT_RESERVE_SIZE, .commit_size = ARENA_DEFAULT_COMMIT_SIZE, .flags = ARENA_FLAG_SCRATCH, __VA_ARGS__})
 #define arena_scratch_scope(arena)          for (arena = arena_scratch_alloc(); arena; arena_scratch_release(arena), arena = 0)

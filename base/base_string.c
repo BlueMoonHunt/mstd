@@ -162,7 +162,7 @@ internal Str8 str8_from_str16(Arena* arena, Str16 str) {
         size += utf8_size(d.codepoint);
     }
 
-    out = arena_push_array(arena, U8, size + 1);
+    out = arena_push_array(arena, U8, size);
 
     for (ptr = str.data; ptr < opl;) {
         d = utf16_decode(ptr, opl - ptr);
@@ -170,7 +170,6 @@ internal Str8 str8_from_str16(Arena* arena, Str16 str) {
         at += utf8_encode(out + at, d.codepoint);
     }
 
-    out[size] = 0;
     result.data = out;
     result.size = size;
     return result;
@@ -193,12 +192,11 @@ internal Str8 str8_from_str32(Arena* arena, Str32 str) {
     for (; ptr < opl; ptr++)
         size += utf8_size(*ptr);
 
-    out = arena_push_array(arena, U8, size + 1);
+    out = arena_push_array(arena, U8, size);
 
     for (ptr = str.data; ptr < opl; ptr++)
         at += utf8_encode(out + at, *ptr);
 
-    out[size] = 0;
     result.data = out;
     result.size = size;
 
@@ -220,8 +218,7 @@ internal Str8 str8_from_cstr(char* str) {
 internal Str8 str8_from_size(Arena* arena, U64 size) {
     Str8 result;
 
-    result.data = arena_push_array(arena, U8, size + 1);
-    result.data[size] = 0;
+    result.data = arena_push_array(arena, U8, size);
     result.size = size;
 
     return result;
@@ -243,23 +240,10 @@ internal Str8 str8_from_fmt(Arena* arena, char* fmt, ...) {
 
     if (length) {
         result = str8_from_size(arena, length);
-        vsnprintf((char*)result.data, result.size + 1, fmt, args);
-        result.data[result.size] = 0;
+        vsnprintf((char*)result.data, result.size, fmt, args);
     }
 
     va_end(args);
-    return result;
-}
-
-internal Str8 str8_from_slice(Arena* arena, Str8Slice slice) {
-    Str8 result;
-
-    result.data = arena_push_array(arena, U8, slice.size + 1);
-
-    result.size = slice.size;
-    result.data = slice.data;
-    result.data[result.size] = 0;
-
     return result;
 }
 
@@ -379,7 +363,6 @@ internal Str8 str8_concat(Arena* arena, Str8 a, Str8 b) {
 
     mem_copy(result.data, a.data, a.size);
     mem_copy(result.data + a.size, b.data, b.size);
-    result.data[result.size] = 0;
 
     return result;
 }
@@ -420,7 +403,6 @@ internal Str8 str8_copy(Arena *arena, Str8 str) {
 
     target = str8_from_size(arena, str.size);
     mem_copy_array(target.data, str.data, str.size);
-    target.data[target.size] = 0;
 
     return target;
 }
@@ -428,24 +410,66 @@ internal Str8 str8_copy(Arena *arena, Str8 str) {
 internal char *str8_copy_to_cstr(Arena *arena, Str8 str) {
     char* target;
 
-    target = arena_push_array(arena, char, str.size + 1);
+    target = arena_push_array(arena, char, str.size);
     mem_copy_array(target, str.data, str.size);
-    target[str.size] = 0;
 
     return target;
 }
 
-internal Str8Slice str8_slice(Str8Slice slice, U64 begin, U64 end) {
-    Str8Slice result;
+internal Str8 str8_slice(Str8 str, U64 begin, U64 end) {
+    begin = clamp_top(begin, str.size);
+    end = clamp_top(end, str.size);
 
-    mem_set(&result, 0, sizeof result);
+    str.data += begin;
+    str.size = (end - begin);
 
-    if (begin <= end && end <= slice.size) {
-        result.data = slice.data + begin;
-        result.size = end - begin;
+    return str;
+}
+
+internal U32 str8_is_integer(Str8 str) {
+    U32 i, result;
+
+    result = 1;
+
+    for_each_index(i, str.size) {
+        if (!char_is_numeric(str.data[i]))
+            result = 0;
     }
 
     return result;
+}
+
+internal U64 u64_from_str8(Str8 str, U8 base) {
+    U32 i;
+    U64 number;
+
+    number = 0;
+
+    for_each_index(i, str.size) {
+        number *= base;
+        number += (CHAR_LUT[str.data[i]] & CHAR_DIGIT_MASK);
+    }
+
+    return number;
+}
+
+internal Str8 str8_from_u64(Arena* arena, U64 num) {
+    Str8 str;
+    U64 temp;
+
+    temp = num;
+
+    for (str.size = 0; temp; temp /= 10)
+        str.size++;
+
+    str = str8_from_size(arena, str.size);
+
+    for (temp = str.size; temp > 0; temp--) {
+        str.data[temp - 1] = (U8)('0' + (num % 10));
+        num /= 10;
+    }
+
+    return str;
 }
 
 internal Str16 str16_from_cstr(U16* str) {
@@ -481,7 +505,7 @@ internal Str16 str16_from_str8(Arena* arena, Str8 str) {
             size += utf16_size(d.codepoint);
         }
 
-        out = arena_push_array(arena, U16, size + 1);
+        out = arena_push_array(arena, U16, size);
 
         ptr = str.data;
 
@@ -491,7 +515,6 @@ internal Str16 str16_from_str8(Arena* arena, Str8 str) {
             at += utf16_encode(out + at, d.codepoint);
         }
 
-        out[size] = 0;
         result.data = out;
         result.size = size;
     }
@@ -502,8 +525,7 @@ internal Str16 str16_from_str8(Arena* arena, Str8 str) {
 internal Str16 str16_from_size(Arena* arena, U64 size) {
     Str16 result;
 
-    result.data = arena_push_array(arena, U16, size + 1);
-    result.data[size] = 0;
+    result.data = arena_push_array(arena, U16, size);
     result.size = size;
 
     return result;
@@ -541,7 +563,7 @@ internal Str32 str32_from_str8(Arena* arena, Str8 str) {
             ptr += d.inc;
         }
 
-        out = arena_push_array(arena, U32, size + 1);
+        out = arena_push_array(arena, U32, size);
 
         ptr = str.data;
 
@@ -551,7 +573,6 @@ internal Str32 str32_from_str8(Arena* arena, Str8 str) {
             out[at++] = d.codepoint;
         }
 
-        out[size] = 0;
         result.data = out;
         result.size = size;
     }
@@ -562,8 +583,7 @@ internal Str32 str32_from_str8(Arena* arena, Str8 str) {
 internal Str32 str32_from_size(Arena* arena, U64 size) {
     Str32 result;
 
-    result.data = arena_push_array(arena, U32, size + 1);
-    result.data[size] = 0;
+    result.data = arena_push_array(arena, U32, size);
     result.size = size;
 
     return result;

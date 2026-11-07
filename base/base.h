@@ -23,6 +23,7 @@
 #include "base_thread.h"
 #include "base_file.h"
 #include "base_time.h"
+#include "base_ring_buffer.h"
 
 #if OS_WINDOWS
 

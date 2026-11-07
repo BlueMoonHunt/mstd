@@ -7,6 +7,7 @@
 #include "base_file.c"
 #include "base_file_watcher.c"
 #include "base_time.c"
+#include "base_ring_buffer.c"
 
 #if OS_WINDOWS
 #include "../win32/base/w32_base.c"

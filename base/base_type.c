@@ -380,27 +380,3 @@ internal force_inline void* ptr_atomic_cas_weak(void* volatile* dst, void* expec
     return _InterlockedCompareExchangePointer(dst, desired, expected);
 #endif
 }
-
-internal force_inline U8 type_get_size(Type_Indicator type) {
-    return (type & 0x0FU);
-}
-
-internal force_inline U8 type_is_void(Type_Indicator type) {
-    return (type == TYPE_VOID);
-}
-
-internal force_inline U8 type_is_signed(Type_Indicator type) {
-    return (type) ? bit_is_set(type, TYPE_SIGN_BIT) : 0;
-}
-
-internal force_inline U8 type_is_integer(Type_Indicator type) {
-    return (type) ? bit_is_set(type, TYPE_INTEGER_BIT) : 0;
-}
-
-internal force_inline U8 type_is_float(Type_Indicator type) {
-    return (type) ? !bit_is_set(type, TYPE_INTEGER_BIT) : 0;
-}
-
-internal force_inline U8 type_is_unsigned(Type_Indicator type) {
-    return (type) ? !bit_is_set(type, TYPE_SIGN_BIT) : 0;
-}

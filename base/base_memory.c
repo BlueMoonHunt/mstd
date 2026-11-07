@@ -10,6 +10,36 @@ internal force_inline void mem_set(void* mem, U8 byte, U64 size) {
     memset(mem, byte, size);
 }
 
+internal U64 mem_write_wrapped(U8* ring_base, U64 ring_size, U64 write_pos, U8* src, U64 src_size) {
+    U64 offset;
+    U64 pre_split_bytes;
+    U64 post_split_bytes;
+
+    offset              = write_pos % ring_size;
+    pre_split_bytes     = clamp_top(src_size, ring_size - offset);
+    post_split_bytes    = ring_size - pre_split_bytes;
+
+    mem_copy_array(ring_base + offset,  src,                    pre_split_bytes);
+    mem_copy_array(ring_base,           src + pre_split_bytes,  post_split_bytes);
+
+    return src_size;
+}
+
+internal U64 mem_read_wrapped(U8* ring_base, U64 ring_size, U64 read_pos, U8* dest, U64 dest_size) {
+    U64 offset;
+    U64 pre_split_bytes;
+    U64 post_split_bytes;
+
+    offset           = read_pos % ring_size;
+    pre_split_bytes  = clamp_top(dest_size, ring_size - offset);
+    post_split_bytes = dest_size - pre_split_bytes;
+
+    mem_copy_array(dest,                   ring_base + offset, pre_split_bytes);
+    mem_copy_array(dest + pre_split_bytes, ring_base,          post_split_bytes);
+
+    return dest_size;
+}
+
 internal Arena* arena_alloc_(ArenaParmas* params) {
     Arena* arena;
     U64 page_size;
@@ -26,8 +56,8 @@ internal Arena* arena_alloc_(ArenaParmas* params) {
     if (flags & ARENA_FLAG_FORCE_ALIGNMENT) {
         alignment = flags & mask(8);
 
-        if (alignment == 0)                 bit_unset(flags, ARENA_FLAG_FORCE_ALIGNMENT_BIT);
-        else if (!num_is_pow2(alignment))   alignment = 1U << u32_msb(alignment);
+        if (alignment == 0 || !num_is_pow2(alignment))
+            bit_unset(flags, ARENA_FLAG_FORCE_ALIGNMENT_BIT);
     }
 
     page_size       = (flags & ARENA_FLAG_LARGE_PAGES)      ? system_info()->large_page_size                  : system_info()->page_size;

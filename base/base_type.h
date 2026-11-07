@@ -232,45 +232,4 @@ internal force_inline void* ptr_atomic_exchange(void* volatile* dst, void* desir
 internal force_inline void* ptr_atomic_cas(void* volatile* dst, void* expected, void* desired);
 internal force_inline void* ptr_atomic_cas_weak(void* volatile* dst, void* expected, void* desired);
 
-/* Type Indicator */
-
-typedef U8 Type_Indicator;
-
-enum {
-    TYPE_SIGN_BIT       = 6,
-    TYPE_INTEGER_BIT    = 7,
-};
-
-enum {
-    TYPE_VOID       = 0,
-
-    TYPE_INTEGER    = bit(TYPE_INTEGER_BIT),
-    TYPE_FLOAT      = !bit(TYPE_INTEGER_BIT),
-
-    TYPE_SIGNED     = bit(TYPE_SIGN_BIT),
-    TYPE_UNSIGNED   = !bit(TYPE_SIGN_BIT),
-};
-
-enum {
-    TYPE_U8     = TYPE_INTEGER | TYPE_UNSIGNED | sizeof(U8),
-    TYPE_U16    = TYPE_INTEGER | TYPE_UNSIGNED | sizeof(U16),
-    TYPE_U32    = TYPE_INTEGER | TYPE_UNSIGNED | sizeof(U32),
-    TYPE_U64    = TYPE_INTEGER | TYPE_UNSIGNED | sizeof(U64),
-
-    TYPE_I8     = TYPE_INTEGER | TYPE_SIGNED | sizeof(I8),
-    TYPE_I16    = TYPE_INTEGER | TYPE_SIGNED | sizeof(I16),
-    TYPE_I32    = TYPE_INTEGER | TYPE_SIGNED | sizeof(I32),
-    TYPE_I64    = TYPE_INTEGER | TYPE_SIGNED | sizeof(I64),
-
-    TYPE_F32    = TYPE_FLOAT | TYPE_SIGNED | sizeof(F32),
-    TYPE_F64    = TYPE_FLOAT | TYPE_SIGNED | sizeof(F64),
-};
-
-internal force_inline U8 type_get_size(Type_Indicator type);
-internal force_inline U8 type_is_void(Type_Indicator type);
-internal force_inline U8 type_is_signed(Type_Indicator type);
-internal force_inline U8 type_is_integer(Type_Indicator type);
-internal force_inline U8 type_is_float(Type_Indicator type);
-internal force_inline U8 type_is_unsigned(Type_Indicator type);
-
 #endif /* BASE_TYPE_H */
