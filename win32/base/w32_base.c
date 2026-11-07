@@ -74,8 +74,6 @@ internal void w32_process_info_fetch(void) {
     arena_scratch_release(scratch);
 }
 
-LRESULT CALLBACK w32_message_callback(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-
 internal void os_state_init(void) {
     SYSTEM_INFO sys_info;
     LARGE_INTEGER resolution;
