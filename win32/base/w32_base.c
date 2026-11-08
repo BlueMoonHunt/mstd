@@ -184,8 +184,8 @@ internal U32 thread_join(Handle thread, U64 end_us) {
     wait    = WAIT_OBJECT_0;
 
     if (entity) {
-        sleep_ms = w32_sleep_ms_from_end_us(end_us);
-        wait = WaitForSingleObject(entity->thread.handle, sleep_ms);
+        sleep_ms    = w32_sleep_ms_from_end_us(end_us);
+        wait        = WaitForSingleObject(entity->thread.handle, sleep_ms);
 
         CloseHandle(entity->thread.handle);
         w32_entity_release(entity);
@@ -383,8 +383,8 @@ internal Handle semaphore_create(U32 initial_count, U32 max_count, Str8 name) {
     Handle semaphore;
 
     arena_scratch_scope(arena) {
-        name_16 = str16_from_str8(arena, name);
-        semaphore.val[0] = (U64)CreateSemaphoreW(0, initial_count, max_count, (WCHAR*)name_16.data);
+        name_16             = str16_from_str8(arena, name);
+        semaphore.val[0]    = (U64)CreateSemaphoreW(0, initial_count, max_count, (WCHAR*)name_16.data);
     }
 
     return semaphore;
@@ -400,8 +400,8 @@ internal Handle semaphore_open(Str8 name) {
     Handle semaphore;
 
     arena_scratch_scope(arena) {
-        name_16 = str16_from_str8(arena, name);
-        semaphore.val[0] = (U64)OpenSemaphoreW(SEMAPHORE_ALL_ACCESS, 0, (WCHAR*)name_16.data);
+        name_16             = str16_from_str8(arena, name);
+        semaphore.val[0]    = (U64)OpenSemaphoreW(SEMAPHORE_ALL_ACCESS, 0, (WCHAR*)name_16.data);
     }
 
     return semaphore;
@@ -468,6 +468,38 @@ internal void atomic_wake(volatile U32* addr) {
 
 internal void atomic_wake_all(volatile U32* addr) {
     WakeByAddressAll((volatile PVOID)addr);
+}
+
+/* Stripe */
+
+internal StripeArray stripe_array_alloc(Arena* arena) {
+    StripeArray array;
+    U32 index;
+
+    array.count = system_info()->logical_processor_count;
+    array.data  = arena_push_array(arena, Stripe, array.count);
+
+    for_each_index(index, array.count) {
+        array.data[index].arena     = arena_alloc();
+        array.data[index].cond_var  = cond_var_create();
+        array.data[index].rw_mutex  = rw_mutex_create();
+    }
+
+    return array;
+}
+
+internal void stripe_array_release(StripeArray* stripes) {
+    U32 index;
+
+    for_each_index(index, stripes->count) {
+        arena_release(stripes->data[index].arena);
+        rw_mutex_destroy(stripes->data[index].rw_mutex);
+        cond_var_destroy(stripes->data[index].cond_var);
+    }
+}
+
+internal Stripe* stripe_from_slot_idx(StripeArray* stripes, U64 slot_idx) {
+    return &stripes->data[slot_idx%stripes->count];
 }
 
 /* File */
@@ -567,11 +599,10 @@ internal U32 file_exists(Str8 path) {
     U32 attributes;
     U32 exists;
 
-    arena   = arena_scratch_alloc();
-    path_16 = str16_from_str8(arena, path);
-
-    attributes = GetFileAttributesW(path_16.data);
-    exists = (attributes != INVALID_FILE_ATTRIBUTES) && !!(~attributes & FILE_ATTRIBUTE_DIRECTORY);
+    arena       = arena_scratch_alloc();
+    path_16     = str16_from_str8(arena, path);
+    attributes  = GetFileAttributesW(path_16.data);
+    exists      = (attributes != INVALID_FILE_ATTRIBUTES) && !!(~attributes & FILE_ATTRIBUTE_DIRECTORY);
 
     arena_scratch_release(arena);
 
@@ -588,8 +619,8 @@ internal U32 file_directory_exists(Str8 path) {
     path_16 = str16_from_str8(arena, path);
 
 
-    attributes = GetFileAttributesW(path_16.data);
-    exists = (attributes != INVALID_FILE_ATTRIBUTES) && (attributes & FILE_ATTRIBUTE_DIRECTORY);
+    attributes  = GetFileAttributesW(path_16.data);
+    exists      = (attributes != INVALID_FILE_ATTRIBUTES) && (attributes & FILE_ATTRIBUTE_DIRECTORY);
 
     arena_scratch_release(arena);
 
@@ -663,17 +694,17 @@ internal Str8 file_read(Arena *arena, Handle handle, U64 size, U64 offset) {
     _size = 0;
 
     if (GetFileSizeEx((HANDLE)handle.val[0], (LARGE_INTEGER*)&_size)) {
-        total_to_read = clamp_top(size, _size);
-        out = arena_push_array(arena, U8, total_to_read + 1);
+        total_to_read   = clamp_top(size, _size);
+        out             = arena_push_array(arena, U8, total_to_read + 1);
 
         for (; total_read_size < total_to_read;) {
-            remaining = total_to_read - total_read_size;
-            to_read = (U32)clamp_top(remaining, U32_MAX);
+            remaining   = total_to_read - total_read_size;
+            to_read     = (U32)clamp_top(remaining, U32_MAX);
             actual_read = 0;
 
             mem_zero_type(&overlapped);
-            overlapped.Offset = (U32)(offset & U32_MAX);
-            overlapped.OffsetHigh = (U32)(offset >> 32);
+            overlapped.Offset       = (U32)(offset & U32_MAX);
+            overlapped.OffsetHigh   = (U32)(offset >> 32);
 
             if (ReadFile((HANDLE)handle.val[0], out + total_read_size, to_read, &actual_read, &overlapped)) {
                 offset += actual_read;

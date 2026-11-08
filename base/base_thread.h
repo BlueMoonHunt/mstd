@@ -5,22 +5,26 @@ typedef void ThreadEntryFunction(void* data);
 
 internal void thread_entrypoint(ThreadEntryFunction* func, void* data);
 
+/* Threads */
 internal Handle thread_create(ThreadEntryFunction* func, void* data);
 internal void thread_destroy(Handle thread);
 internal U32 thread_join(Handle thread, U64 end_time_us);
 internal U32 thread_id(void);
 internal void thread_sleep(U64 us);
 
+/* Mutex */
 internal Handle mutex_create(void);
 internal void mutex_destroy(Handle mutex);
 internal void mutex_take(Handle mutex);
 internal void mutex_drop(Handle mutex);
 
+/* RW Mutex */
 internal Handle rw_mutex_create(void);
 internal void rw_mutex_destroy(Handle mutex);
 internal void rw_mutex_take(Handle mutex, U32 write_mode);
 internal void rw_mutex_drop(Handle mutex, U32 write_mode);
 
+/* Condition Variable */
 internal Handle cond_var_create(void);
 internal void cond_var_destroy(Handle cond_var);
 internal U32 cond_var_wait(Handle cond_var, Handle rw_mutex, U64 end_us);
@@ -52,5 +56,24 @@ internal void atomic_wake_all(volatile U32* addr);
 /* Spinlock */
 internal void spinlock_acquire(volatile U32* lock);
 internal void spinlock_release(volatile U32* lock);
+
+/* Stripe */
+typedef struct Stripe Stripe;
+struct Stripe {
+    Arena* arena;
+    Handle rw_mutex;
+    Handle cond_var;
+    void* free;
+};
+
+typedef struct StripeArray StripeArray;
+struct StripeArray {
+    Stripe* data;
+    U64 count;
+};
+
+internal StripeArray stripe_array_alloc(Arena* arena);
+internal void stripe_array_release(StripeArray* stripes);
+internal Stripe* stripe_from_slot_idx(StripeArray* stripes, U64 slot_idx);
 
 #endif /* BASE_THREAD_H */
