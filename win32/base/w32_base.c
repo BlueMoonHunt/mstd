@@ -542,8 +542,8 @@ internal U32 file_copy(Str8 src, Str8 dest) {
 
     sleep_us    = 500;
     arena       = arena_scratch_alloc();
-    src_16      = str16_from_str8(arena, src);
-    dest_16     = str16_from_str8(arena, dest);
+    src_16      = str16_nt(arena, str16_from_str8(arena, src));
+    dest_16     = str16_nt(arena, str16_from_str8(arena, dest));
 
 
     for_each_index(i, FILE_MAX_RETRIES) {
@@ -573,8 +573,8 @@ internal U32 file_move(Str8 src, Str8 dest) {
 
     sleep_us    = 500;
     arena       = arena_scratch_alloc();
-    src_16      = str16_from_str8(arena, src);
-    dest_16     = str16_from_str8(arena, dest);
+    src_16      = str16_nt(arena, str16_from_str8(arena, src));
+    dest_16     = str16_nt(arena, str16_from_str8(arena, dest));
 
     for_each_index(i, FILE_MAX_RETRIES) {
         if (MoveFileExW(src_16.data, dest_16.data, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH))
@@ -652,7 +652,7 @@ internal Handle file_open(Str8 name, FileAccessFlag flags) {
     share_mode      = 0;
     result.val[0]   = 0;
     arena           = arena_scratch_alloc();
-    path_16         = str16_from_str8(arena, name);
+    path_16         = str16_nt(arena, str16_from_str8(arena, name));
     creation_flag   = OPEN_EXISTING;
 
 
@@ -765,7 +765,7 @@ internal Handle file_watcher_create(Arena* arena, Str8 path, U32 watch_sub_direc
     DWORD attributes;
 
     scratch    = arena_scratch_alloc();
-    path_16    = str16_from_str8(scratch, path);
+    path_16    = str16_nt(arena, str16_from_str8(arena, path));
     access     = FILE_LIST_DIRECTORY;
     share_mode = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
     attributes = FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED;
@@ -931,4 +931,112 @@ internal void* lib_symbol_get_(Handle lib, Str8 symbol_name) {
 
 internal void lib_unload(Handle lib) {
     FreeLibrary((HMODULE)lib.val[0]);
+}
+
+/* Process */
+
+internal void process_cli_attach(U32 if_exists) {
+    if (if_exists ? AllocConsole() : AttachConsole(ATTACH_PARENT_PROCESS)) {
+         FILE *dummy;
+        freopen_s(&dummy, "CONOUT$", "w", stdout);
+        freopen_s(&dummy, "CONOUT$", "w", stderr);
+        freopen_s(&dummy, "CONIN$", "r", stdin);
+
+        setvbuf(stdout, NULL, _IONBF, 0);
+        setvbuf(stderr, NULL, _IONBF, 0);
+    }
+}
+
+internal U32 process_create_(ProcessCreateParams* params) {
+    Arena* scratch;
+    Str8 header;
+    Str16 cmd_line;
+    U32 process_id;
+    BOOL success;
+    BOOL inherit_handles;
+    HANDLE nul_handle;
+    DWORD flags;
+    STARTUPINFOW si;
+    PROCESS_INFORMATION pi;
+    SECURITY_ATTRIBUTES sa;
+
+    mem_zero_type(&si);
+    mem_zero_type(&sa);
+    mem_zero_type(&pi);
+
+    flags           = 0;
+    process_id      = 0;
+    success         = 0;
+    nul_handle      = INVALID_HANDLE_VALUE;
+    scratch         = arena_scratch_alloc();
+    si.cb           = sizeof(si);
+    si.dwFlags      = STARTF_USESTDHANDLES;
+    inherit_handles = params->inherit_handles;
+
+    header              = (params->cmd_header.size) ? params->cmd_header : str8_lit("cmd.exe /c ");
+    params->cmd_line    = str8_concat(scratch, header, params->cmd_line);
+    cmd_line            = str16_nt(scratch, str16_from_str8(scratch, params->cmd_line));
+
+    switch (params->priority) {
+        case PROCESS_PRIORITY_NORMAL:   { flags |= NORMAL_PRIORITY_CLASS; } break;
+        case PROCESS_PRIORITY_IDLE:     { flags |= IDLE_PRIORITY_CLASS; } break;
+        case PROCESS_PRIORITY_HIGH:     { flags |= HIGH_PRIORITY_CLASS; } break;
+        case PROCESS_PRIORITY_REALTIME: { flags |= REALTIME_PRIORITY_CLASS; } break;
+    }
+
+    if (params->hidden) {
+        si.dwFlags      |=  STARTF_USESHOWWINDOW;
+        si.wShowWindow  =   SW_HIDE;
+
+        if (params->run_detached)
+            flags |= DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP;
+        else
+            flags |= CREATE_NO_WINDOW;
+    }
+    else if (params->run_detached) {
+        flags |= CREATE_NEW_PROCESS_GROUP;
+
+        if (!params->inherit_handles)
+            flags |= CREATE_NEW_CONSOLE;
+    }
+
+    if (params->hidden && params->run_detached) {
+        sa.bInheritHandle       = 1;
+        sa.lpSecurityDescriptor = 0;
+        sa.nLength              = sizeof(sa);
+
+        nul_handle = CreateFileW(L"NUL", GENERIC_READ | GENERIC_WRITE,
+                                 FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                 &sa, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+
+        if (nul_handle != INVALID_HANDLE_VALUE) {
+            si.hStdInput    = nul_handle;
+            si.hStdOutput   = nul_handle;
+            si.hStdError    = nul_handle;
+            inherit_handles = 1;
+        }
+    } else if (params->inherit_handles) {
+        si.hStdInput  = GetStdHandle(STD_INPUT_HANDLE);
+        si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+        si.hStdError  = GetStdHandle(STD_ERROR_HANDLE);
+    }
+
+    success = CreateProcessW(0, cmd_line.data, 0, 0, inherit_handles, flags, 0, 0, &si, &pi);
+
+    if (nul_handle != INVALID_HANDLE_VALUE)
+        CloseHandle(nul_handle);
+
+    if (success) {
+        process_id = pi.dwProcessId;
+
+        if (!params->run_detached)
+            WaitForSingleObject(pi.hProcess, INFINITE);
+
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+    }
+
+    arena_scratch_release(scratch);
+
+    return process_id;
 }
