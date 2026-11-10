@@ -136,6 +136,8 @@ internal Str8 str8_from_str32(Arena* arena, Str32 str);
 internal Str8 str8_from_size(Arena* arena, U64 size);
 internal Str8 str8_slice(Str8 str, U64 begin, U64 end);
 
+internal Str8 str8_nt(Arena* arena, Str8 str);
+
 /* String number convertor */
 
 global read_only U8 NUM_CHAR_LUT[16] = {
@@ -166,7 +168,6 @@ internal U32 str8_match(Str8 a, Str8 b, Str8MatchFlag flags);
 internal U64 str8_find(Str8 target, Str8 query, U64 offset, Str8MatchFlag flags);
 internal U64 str8_find_reverse(Str8 target, Str8 query, U64 offset, Str8MatchFlag flags);
 
-/* String concatinate and copy */
 internal Str8 str8_concat(Arena* arena, Str8 a, Str8 b);
 internal Str8 str8_concat_n_(Arena* arena, ...);
 
@@ -180,7 +181,6 @@ typedef struct Str16 {
     U64 size;
 } Str16;
 
-/* String Constructors */
 #define str16_lit(S) ((Str16){ .size = (sizeof(S) / sizeof((*S))) - 1, .data = (S) })
 #define str16(S) str16_from_cstr(S)
 
@@ -188,15 +188,28 @@ internal Str16 str16_from_cstr(U16* str);
 internal Str16 str16_from_str8(Arena* arena, Str8 str);
 internal Str16 str16_from_size(Arena* arena, U64 size);
 
+internal Str16 str16_nt(Arena* arena, Str16 str);
+
+internal Str16 str16_concat(Arena* arena, Str16 a, Str16 b);
+internal Str16 str16_concat_n_(Arena* arena, ...);
+
+#define str16_concat_n(arena, ...) str16_concat_n_(arena, __VA_ARGS__, (Str16){0})
+
 typedef struct Str32 {
     U32* data;
     U64 size;
 } Str32;
 
-/* String Constructors */
 #define str32_lit(S) ((Str32){ .size = (sizeof(S) / sizeof((*S))) - 1, .data = (S) })
 #define str32(S) str32_from_cstr(S)
 
 internal Str32 str32_from_cstr(U32* str);
 internal Str32 str32_from_str8(Arena* arena, Str8 str);
 internal Str32 str32_from_size(Arena* arena, U64 size);
+
+internal Str32 str32_nt(Arena* arena, Str32 str);
+
+internal Str32 str32_concat(Arena* arena, Str32 a, Str32 b);
+internal Str32 str32_concat_n_(Arena* arena, ...);
+
+#define str32_concat_n(arena, ...) str32_concat_n_(arena, __VA_ARGS__, (Str32){0})

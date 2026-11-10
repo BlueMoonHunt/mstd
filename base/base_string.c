@@ -426,6 +426,18 @@ internal Str8 str8_slice(Str8 str, U64 begin, U64 end) {
     return str;
 }
 
+internal Str8 str8_nt(Arena* arena, Str8 str) {
+    Str8 new_str;
+
+    new_str = str8_from_size(arena, str.size + 1);
+    mem_copy(new_str.data, str.data, str.size);
+
+    new_str.data[str.size] = 0;
+    new_str.size--;
+
+    return new_str;
+}
+
 internal U32 str8_is_integer(Str8 str) {
     U32 i, result;
 
@@ -531,6 +543,61 @@ internal Str16 str16_from_size(Arena* arena, U64 size) {
     return result;
 }
 
+internal Str16 str16_nt(Arena* arena, Str16 str) {
+    Str16 new_str;
+
+    new_str = str16_from_size(arena, str.size + 1);
+    mem_copy(new_str.data, str.data, str.size * sizeof(U16));
+
+    new_str.data[str.size] = 0;
+    new_str.size--;
+
+    return new_str;
+}
+
+internal Str16 str16_concat(Arena* arena, Str16 a, Str16 b) {
+    Str16 result;
+
+    result = str16_from_size(arena, a.size + b.size);
+
+    mem_copy(result.data, a.data, a.size * sizeof(U16));
+    mem_copy(result.data + a.size, b.data, b.size * sizeof(U16));
+
+    return result;
+}
+
+internal Str16 str16_concat_n_(Arena* arena, ...) {
+    va_list args;
+    U16* buffer;
+    U64 size;
+    Str16 result;
+    U64 offset;
+
+    va_start(args, arena);
+
+    for (size = 0; result.data; size += result.size) {
+        result = va_arg(args, Str16);
+    }
+
+    va_end(args);
+
+    buffer = arena_push_array(arena, U16, size);
+
+    va_start(args, arena);
+
+    for (offset = 0; result.data || result.size != STRNPOS; offset += result.size) {
+        result = va_arg(args, Str16);
+        mem_copy(buffer + offset, result.data, result.size * sizeof(U16));
+    }
+
+    va_end(args);
+
+    result.size = size;
+    result.data = buffer;
+
+    return result;
+}
+
 internal Str32 str32_from_cstr(U32* str) {
     U64 size;
     Str32 result;
@@ -585,6 +652,61 @@ internal Str32 str32_from_size(Arena* arena, U64 size) {
 
     result.data = arena_push_array(arena, U32, size);
     result.size = size;
+
+    return result;
+}
+
+internal Str32 str32_nt(Arena* arena, Str32 str) {
+    Str32 new_str;
+
+    new_str = str32_from_size(arena, str.size + 1);
+    mem_copy(new_str.data, str.data, str.size * sizeof(U32));
+
+    new_str.data[str.size] = 0;
+    new_str.size--;
+
+    return new_str;
+}
+
+internal Str32 str32_concat_n_(Arena* arena, ...) {
+    va_list args;
+    U32* buffer;
+    U64 size;
+    Str32 result;
+    U64 offset;
+
+    va_start(args, arena);
+
+    for (size = 0; result.data; size += result.size) {
+        result = va_arg(args, Str32);
+    }
+
+    va_end(args);
+
+    buffer = arena_push_array(arena, U32, size);
+
+    va_start(args, arena);
+
+    for (offset = 0; result.data || result.size != STRNPOS; offset += result.size) {
+        result = va_arg(args, Str32);
+        mem_copy(buffer + offset, result.data, result.size * sizeof(U32));
+    }
+
+    va_end(args);
+
+    result.size = size;
+    result.data = buffer;
+
+    return result;
+}
+
+internal Str32 str32_concat(Arena* arena, Str32 a, Str32 b) {
+    Str32 result;
+
+    result = str32_from_size(arena, a.size + b.size);
+
+    mem_copy(result.data, a.data, a.size * sizeof(U32));
+    mem_copy(result.data + a.size, b.data, b.size * sizeof(U32));
 
     return result;
 }
