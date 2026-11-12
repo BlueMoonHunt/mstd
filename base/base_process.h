@@ -13,7 +13,13 @@ enum {
 typedef struct ProcessCreateParams ProcessCreateParams;
 struct ProcessCreateParams {
     Str8 cmd_line;
-    Str8 cmd_header;                /* optional : use in case you need to run a custom shell. */
+    Str8 cmd_header;                /* optional: use in case you need to run a custom shell. */
+    Str8 stdin_path;                /* optional: file path to redirect standard input */
+    Str8 stdout_path;               /* optional: file path to redirect standard output */
+    Str8 stderr_path;               /* optional: file path to redirect standard error */
+    FileAccessFlag stdout_access_flags;
+    FileAccessFlag stdin_access_flags;
+    FileAccessFlag stderr_access_flags;
     ProcessPriority priority;
     U8 inherit_handles;             /* other than setting bool it also attaches parent's STD_IN, STD_OUT and STD_ERROR */
     U8 run_detached;

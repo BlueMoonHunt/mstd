@@ -639,29 +639,48 @@ internal U64 file_size_get(Handle file) {
     return (U64)size.QuadPart;
 }
 
+internal void w32_file_access_flags_parse(FileAccessFlag flags, DWORD* access_flags, DWORD* share_mode, DWORD* creation_flags) {
+    DWORD access;
+    DWORD creation;
+    DWORD share;
+
+    access   = 0;
+    share    = 0;
+    creation = OPEN_EXISTING;
+
+    if (flags & FILE_ACCESS_FLAG_READ)        { access |= GENERIC_READ; }
+    if (flags & FILE_ACCESS_FLAG_SHARE_READ)  { share  |= FILE_SHARE_READ; }
+    if (flags & FILE_ACCESS_FLAG_EXECUTE)     { access |= GENERIC_EXECUTE; }
+    if (flags & FILE_ACCESS_FLAG_SHARE_WRITE) { share  |= FILE_SHARE_WRITE | FILE_SHARE_DELETE; }
+
+    if (flags & FILE_ACCESS_FLAG_APPEND) {
+        access  |= (FILE_GENERIC_WRITE & ~FILE_WRITE_DATA);
+        creation = OPEN_ALWAYS;
+    }
+    else if (flags & FILE_ACCESS_FLAG_WRITE) {
+        access  |= GENERIC_WRITE;
+        creation = CREATE_ALWAYS;
+    }
+
+    *access_flags   = access;
+    *share_mode     = share;
+    *creation_flags = creation;
+}
+
 internal Handle file_open(Str8 name, FileAccessFlag flags) {
     Handle result;
     Arena* arena;
     Str16 path_16;
-    U32 access_flags;
-    U32 share_mode;
-    U32 creation_flag;
+    DWORD access_flags;
+    DWORD share_mode;
+    DWORD creation_flag;
     HANDLE file;
 
-    access_flags    = 0;
-    share_mode      = 0;
     result.val[0]   = 0;
     arena           = arena_scratch_alloc();
     path_16         = str16_nt(arena, str16_from_str8(arena, name));
-    creation_flag   = OPEN_EXISTING;
 
-
-    if (flags & FILE_ACCESS_FLAG_READ)          { access_flags |= GENERIC_READ; }
-    if (flags & FILE_ACCESS_FLAG_SHARE_READ)    { share_mode |= FILE_SHARE_READ; }
-    if (flags & FILE_ACCESS_FLAG_EXECUTE)       { access_flags |= GENERIC_EXECUTE; }
-    if (flags & FILE_ACCESS_FLAG_SHARE_WRITE)   { share_mode |= FILE_SHARE_WRITE | FILE_SHARE_DELETE; }
-    if (flags & FILE_ACCESS_FLAG_WRITE)         { access_flags |= GENERIC_WRITE; creation_flag = CREATE_ALWAYS; }
-    if (flags & FILE_ACCESS_FLAG_APPEND)        { access_flags &= ~GENERIC_WRITE; access_flags |= FILE_APPEND_DATA; creation_flag = OPEN_ALWAYS; }
+    w32_file_access_flags_parse(flags, &access_flags, &share_mode, &creation_flag);
 
     file = CreateFileW((WCHAR*)path_16.data, access_flags, share_mode, 0, creation_flag, FILE_ATTRIBUTE_NORMAL, 0);
 
@@ -947,6 +966,38 @@ internal void process_cli_attach(U32 if_exists) {
     }
 }
 
+internal HANDLE w32_process_resolve_std_handles(Arena* arena, SECURITY_ATTRIBUTES* sa, FileAccessFlag flags, Str8 path, HANDLE nul, DWORD std_id, BOOL inherit) {
+    DWORD access_flags;
+    DWORD share_mode;
+    DWORD creation_flags;
+    HANDLE handle;
+    Str16 path16;
+
+    handle = INVALID_HANDLE_VALUE;
+
+    w32_file_access_flags_parse(flags, &access_flags, &share_mode, &creation_flags);
+
+    if (path.size) {
+        arena_temp_alloc(arena);
+
+        path16 = str16_nt(arena, str16_from_str8(arena, path));
+        handle = CreateFileW(path16.data, access_flags, share_mode, sa, creation_flags, FILE_ATTRIBUTE_NORMAL, 0);
+
+        arena_temp_release(arena);
+    }
+
+    if (handle == INVALID_HANDLE_VALUE) {
+        if (nul != INVALID_HANDLE_VALUE) {
+            handle = nul;
+        }
+        else if (inherit) {
+            handle = GetStdHandle(std_id);
+        }
+    }
+
+    return handle;
+}
+
 internal U32 process_create_(ProcessCreateParams* params) {
     Arena* scratch;
     Str8 header;
@@ -955,6 +1006,9 @@ internal U32 process_create_(ProcessCreateParams* params) {
     BOOL success;
     BOOL inherit_handles;
     HANDLE nul_handle;
+    HANDLE stdin_handle;
+    HANDLE stdout_handle;
+    HANDLE stderr_handle;
     DWORD flags;
     STARTUPINFOW si;
     PROCESS_INFORMATION pi;
@@ -967,7 +1021,6 @@ internal U32 process_create_(ProcessCreateParams* params) {
     flags           = 0;
     process_id      = 0;
     success         = 0;
-    nul_handle      = INVALID_HANDLE_VALUE;
     scratch         = arena_scratch_alloc();
     si.cb           = sizeof(si);
     si.dwFlags      = STARTF_USESTDHANDLES;
@@ -986,12 +1039,8 @@ internal U32 process_create_(ProcessCreateParams* params) {
 
     if (params->hidden) {
         si.dwFlags      |=  STARTF_USESHOWWINDOW;
+        flags           |=  (params->run_detached) ? DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP : CREATE_NO_WINDOW;
         si.wShowWindow  =   SW_HIDE;
-
-        if (params->run_detached)
-            flags |= DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP;
-        else
-            flags |= CREATE_NO_WINDOW;
     }
     else if (params->run_detached) {
         flags |= CREATE_NEW_PROCESS_GROUP;
@@ -1000,31 +1049,36 @@ internal U32 process_create_(ProcessCreateParams* params) {
             flags |= CREATE_NEW_CONSOLE;
     }
 
-    if (params->hidden && params->run_detached) {
-        sa.bInheritHandle       = 1;
-        sa.lpSecurityDescriptor = 0;
-        sa.nLength              = sizeof(sa);
+    sa.nLength              = sizeof(sa);
+    sa.bInheritHandle       = 1;
+    sa.lpSecurityDescriptor = 0;
 
-        nul_handle = CreateFileW(L"NUL", GENERIC_READ | GENERIC_WRITE,
-                                 FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                 &sa, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+    if (params->hidden && params->run_detached)
+        nul_handle = CreateFileW(L"NUL", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+    else
+        nul_handle = INVALID_HANDLE_VALUE;
 
-        if (nul_handle != INVALID_HANDLE_VALUE) {
-            si.hStdInput    = nul_handle;
-            si.hStdOutput   = nul_handle;
-            si.hStdError    = nul_handle;
-            inherit_handles = 1;
-        }
-    } else if (params->inherit_handles) {
-        si.hStdInput  = GetStdHandle(STD_INPUT_HANDLE);
-        si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-        si.hStdError  = GetStdHandle(STD_ERROR_HANDLE);
-    }
+    params->stdin_access_flags  = params->stdin_access_flags  | FILE_ACCESS_FLAG_SHARE_READ | FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_READ;
+    params->stdout_access_flags = params->stdout_access_flags | FILE_ACCESS_FLAG_SHARE_READ | FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_WRITE;
+    params->stderr_access_flags = params->stderr_access_flags | FILE_ACCESS_FLAG_SHARE_READ | FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_WRITE;
+
+    stdin_handle  = w32_process_resolve_std_handles(scratch, &sa, params->stdin_access_flags, params->stdin_path, nul_handle, STD_INPUT_HANDLE, inherit_handles);
+    stdout_handle = w32_process_resolve_std_handles(scratch, &sa, params->stdout_access_flags, params->stdout_path, nul_handle, STD_OUTPUT_HANDLE, inherit_handles);
+    stderr_handle = w32_process_resolve_std_handles(scratch, &sa, params->stderr_access_flags, params->stderr_path, nul_handle, STD_ERROR_HANDLE, inherit_handles);
+
+    si.hStdInput  = stdin_handle;
+    si.hStdOutput = stdout_handle;
+    si.hStdError  = stderr_handle;
+
+    if (stdin_handle != INVALID_HANDLE_VALUE || stdout_handle != INVALID_HANDLE_VALUE || stderr_handle != INVALID_HANDLE_VALUE || nul_handle != INVALID_HANDLE_VALUE)
+        inherit_handles = 1;
 
     success = CreateProcessW(0, cmd_line.data, 0, 0, inherit_handles, flags, 0, 0, &si, &pi);
 
-    if (nul_handle != INVALID_HANDLE_VALUE)
-        CloseHandle(nul_handle);
+    if (stdin_handle  != INVALID_HANDLE_VALUE)  CloseHandle(stdin_handle);
+    if (stdout_handle != INVALID_HANDLE_VALUE)  CloseHandle(stdout_handle);
+    if (stderr_handle != INVALID_HANDLE_VALUE)  CloseHandle(stderr_handle);
+    if (nul_handle    != INVALID_HANDLE_VALUE)  CloseHandle(nul_handle);
 
     if (success) {
         process_id = pi.dwProcessId;

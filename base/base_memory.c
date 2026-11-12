@@ -111,7 +111,7 @@ internal void arena_reset(Arena *arena) {
     arena->temp_stack_tail = 0;
 }
 
-internal void arena_temp_begin(Arena *arena) {
+internal void arena_temp_alloc(Arena *arena) {
     ArenaTemp* node;
     U64 cursor;
 

@@ -1,16 +1,18 @@
 #if !defined(BASE_FILE_H)
 #define BASE_FILE_H
 
-typedef enum FileAccessFlag {
-    FILE_ACCESS_FLAG_OPEN_EXISTING  = 1 << 0,
-    FILE_ACCESS_FLAG_OPEN_ALWAYS    = 1 << 1,
-    FILE_ACCESS_FLAG_SHARE_READ     = 1 << 2,
-    FILE_ACCESS_FLAG_SHARE_WRITE    = 1 << 3,
-    FILE_ACCESS_FLAG_EXECUTE        = 1 << 5,
-    FILE_ACCESS_FLAG_READ           = 1 << 6,
-    FILE_ACCESS_FLAG_WRITE          = 1 << 7,
-    FILE_ACCESS_FLAG_APPEND         = 1 << 8
-} FileAccessFlag;
+typedef U8 FileAccessFlag;
+
+enum {
+    FILE_ACCESS_FLAG_OPEN_EXISTING  = 0,
+    FILE_ACCESS_FLAG_OPEN_ALWAYS    = 1 << 0,
+    FILE_ACCESS_FLAG_SHARE_READ     = 1 << 1,
+    FILE_ACCESS_FLAG_SHARE_WRITE    = 1 << 2,
+    FILE_ACCESS_FLAG_EXECUTE        = 1 << 3,
+    FILE_ACCESS_FLAG_READ           = 1 << 5,
+    FILE_ACCESS_FLAG_WRITE          = 1 << 6,
+    FILE_ACCESS_FLAG_APPEND         = 1 << 7
+};
 
 #define FILE_MAX_RETRIES 5
 
@@ -42,11 +44,12 @@ enum {
     FILE_EVENT_TYPE_RENAMED,
 };
 
-typedef struct FileEvents {
+typedef struct FileEvents FileEvents;
+struct FileEvents {
     U64 count;
     FileEventType* type_array;
     Str8* file_array;
-} FileEvents;
+};
 
 internal Handle file_watcher_create(Arena* arena, Str8 path, U32 watch_sub_directory);
 internal void file_watcher_poll_events(Arena* arena, Handle watcher, FileEvents* events, U32 timeout_ms);

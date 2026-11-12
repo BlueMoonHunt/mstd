@@ -64,11 +64,15 @@ struct W32_State {
 global W32_State w32_state;
 global thread_var HANDLE w32_thread_timer;
 
+internal void w32_file_access_flags_parse(FileAccessFlag flags, DWORD* access_flags, DWORD* share_mode, DWORD* creation_flags);
+
 internal W32_Entity* w32_entity_alloc(W32_EntityType type);
 internal void w32_entity_release(W32_Entity* entity);
 
 internal DWORD w32_thread_entrypoint(void* ptr);
 
 internal U32 w32_sleep_ms_from_end_us(U64 end_us);
+
+internal HANDLE w32_process_resolve_std_handles(Arena* arena, SECURITY_ATTRIBUTES* sa, FileAccessFlag flags, Str8 path, HANDLE nul, DWORD std_id, BOOL inherit);
 
 #endif /* W32_BASE_H */
