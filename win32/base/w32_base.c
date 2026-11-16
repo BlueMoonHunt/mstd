@@ -966,34 +966,27 @@ internal void process_cli_attach(U32 if_exists) {
     }
 }
 
-internal HANDLE w32_process_resolve_std_handles(Arena* arena, SECURITY_ATTRIBUTES* sa, FileAccessFlag flags, Str8 path, HANDLE nul, DWORD std_id, BOOL inherit) {
-    DWORD access_flags;
-    DWORD share_mode;
-    DWORD creation_flags;
-    HANDLE handle;
+
+internal HANDLE w32_process_resolve_std_handle(Arena* arena, Str8 path, FileAccessFlag access_flags) {
+    SECURITY_ATTRIBUTES sa;
     Str16 path16;
+    HANDLE handle;
+    DWORD access;
+    DWORD share;
+    DWORD creation;
 
-    handle = INVALID_HANDLE_VALUE;
+    sa.nLength              = sizeof sa;
+    sa.bInheritHandle       = 1;
+    sa.lpSecurityDescriptor = 0;
 
-    w32_file_access_flags_parse(flags, &access_flags, &share_mode, &creation_flags);
+    w32_file_access_flags_parse(access_flags, &access, &share, &creation);
 
-    if (path.size) {
-        arena_temp_alloc(arena);
+    arena_temp_alloc(arena);
 
-        path16 = str16_nt(arena, str16_from_str8(arena, path));
-        handle = CreateFileW(path16.data, access_flags, share_mode, sa, creation_flags, FILE_ATTRIBUTE_NORMAL, 0);
+    path16 = str16_nt(arena, str16_from_str8(arena, path));
+    handle = CreateFileW(path16.data, access, share, &sa, creation, FILE_ATTRIBUTE_NORMAL, 0);
 
-        arena_temp_release(arena);
-    }
-
-    if (handle == INVALID_HANDLE_VALUE) {
-        if (nul != INVALID_HANDLE_VALUE) {
-            handle = nul;
-        }
-        else if (inherit) {
-            handle = GetStdHandle(std_id);
-        }
-    }
+    arena_temp_release(arena);
 
     return handle;
 }
@@ -1001,34 +994,89 @@ internal HANDLE w32_process_resolve_std_handles(Arena* arena, SECURITY_ATTRIBUTE
 internal U32 process_create_(ProcessCreateParams* params) {
     Arena* scratch;
     Str8 header;
-    Str16 cmd_line;
-    U32 process_id;
-    BOOL success;
-    BOOL inherit_handles;
-    HANDLE nul_handle;
-    HANDLE stdin_handle;
-    HANDLE stdout_handle;
-    HANDLE stderr_handle;
+    Str16 cmd;
     DWORD flags;
     STARTUPINFOW si;
     PROCESS_INFORMATION pi;
-    SECURITY_ATTRIBUTES sa;
+    HANDLE stdin_handle;
+    HANDLE stdout_handle;
+    HANDLE stderr_handle;
+    U8 stdin_own;
+    U8 stdout_own;
+    U8 stderr_own;
+    U8 redirect;
 
     mem_zero_type(&si);
-    mem_zero_type(&sa);
     mem_zero_type(&pi);
 
+    stdin_own       = 0;
+    stdout_own      = 0;
+    stderr_own      = 0;
     flags           = 0;
-    process_id      = 0;
-    success         = 0;
-    scratch         = arena_scratch_alloc();
-    si.cb           = sizeof(si);
-    si.dwFlags      = STARTF_USESTDHANDLES;
-    inherit_handles = params->inherit_handles;
+    redirect        = !!(params->stdin_path.size | params->stdout_path.size | params->stderr_path.size);
+    si.cb           = sizeof si;
+    si.dwFlags      = 0;
+    stdin_handle    = INVALID_HANDLE_VALUE;
+    stdout_handle   = INVALID_HANDLE_VALUE;
+    stderr_handle   = INVALID_HANDLE_VALUE;
 
-    header              = (params->cmd_header.size) ? params->cmd_header : str8_lit("cmd.exe /c ");
-    params->cmd_line    = str8_concat(scratch, header, params->cmd_line);
-    cmd_line            = str16_nt(scratch, str16_from_str8(scratch, params->cmd_line));
+    scratch = arena_scratch_alloc();
+
+    header  = (params->cmd_header.size) ? params->cmd_header : str8_lit("cmd.exe /c ");
+    cmd     = str16_from_str8(scratch, str8_concat(scratch, header, params->cmd_line));
+    cmd     = str16_nt(scratch, cmd);
+
+    if (params->stdin_path.size) {
+        stdin_handle = w32_process_std_handle(scratch, params->stdin_path, params->stdin_access_flags | FILE_ACCESS_FLAG_SHARE_READ | FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_READ);
+
+        if (stdin_handle != INVALID_HANDLE_VALUE)
+            stdin_own = 1;
+        else
+            goto done;
+    }
+
+    if (params->stdout_path.size) {
+        stdout_handle = w32_process_std_handle(scratch, params->stdout_path, params->stdout_access_flags | FILE_ACCESS_FLAG_SHARE_READ | FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_WRITE);
+
+        if (stdout_handle != INVALID_HANDLE_VALUE)
+            stdout_own = 1;
+        else
+            goto done;
+    }
+
+    if (params->stderr_path.size && !str8_match(params->stdout_path, params->stderr_path, STR8_MATCH_FLAG_CASE_INSENSITIVE)) {
+        w32_process_std_handle(scratch, params->stderr_path, params->stdout_access_flags | FILE_ACCESS_FLAG_SHARE_READ | FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_WRITE);
+
+        if (stderr_handle != INVALID_HANDLE_VALUE)
+            stderr_own = 1;
+        else
+            goto done;
+    }
+    else {
+        stderr_handle = stdout_handle;
+    }
+
+    if (params->inherit_handles || redirect) {
+        if (stdin_handle == INVALID_HANDLE_VALUE)       stdin_handle = GetStdHandle(STD_INPUT_HANDLE);
+        if (stdout_handle == INVALID_HANDLE_VALUE)      stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (stderr_handle == INVALID_HANDLE_VALUE)      stderr_handle = GetStdHandle(STD_ERROR_HANDLE);
+
+        si.dwFlags      |= STARTF_USESTDHANDLES;
+        si.hStdInput    = stdin_handle;
+        si.hStdOutput   = stdout_handle;
+        si.hStdError    = stderr_handle;
+    }
+
+    if (params->hidden) {
+        si.dwFlags      |= STARTF_USESHOWWINDOW;
+        si.wShowWindow  = SW_HIDE;
+    }
+
+    if (params->hidden)
+        flags |= CREATE_NO_WINDOW;
+
+    if (params->run_detached)
+        flags |= DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP;
 
     switch (params->priority) {
         case PROCESS_PRIORITY_NORMAL:   { flags |= NORMAL_PRIORITY_CLASS; } break;
@@ -1037,60 +1085,21 @@ internal U32 process_create_(ProcessCreateParams* params) {
         case PROCESS_PRIORITY_REALTIME: { flags |= REALTIME_PRIORITY_CLASS; } break;
     }
 
-    if (params->hidden) {
-        si.dwFlags      |=  STARTF_USESHOWWINDOW;
-        flags           |=  (params->run_detached) ? DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP : CREATE_NO_WINDOW;
-        si.wShowWindow  =   SW_HIDE;
-    }
-    else if (params->run_detached) {
-        flags |= CREATE_NEW_PROCESS_GROUP;
+    if (CreateProcess(0, cmd.data, 0, 0, (params->inherit_handles || redirect) ? TRUE : FALSE, flags, 0, 0, &si, &pi)) {
+        pi.dwProcessId = pi.dwProcessId;
 
-        if (!params->inherit_handles)
-            flags |= CREATE_NEW_CONSOLE;
-    }
-
-    sa.nLength              = sizeof(sa);
-    sa.bInheritHandle       = 1;
-    sa.lpSecurityDescriptor = 0;
-
-    if (params->hidden && params->run_detached)
-        nul_handle = CreateFileW(L"NUL", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-    else
-        nul_handle = INVALID_HANDLE_VALUE;
-
-    params->stdin_access_flags  = params->stdin_access_flags  | FILE_ACCESS_FLAG_SHARE_READ | FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_READ;
-    params->stdout_access_flags = params->stdout_access_flags | FILE_ACCESS_FLAG_SHARE_READ | FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_WRITE;
-    params->stderr_access_flags = params->stderr_access_flags | FILE_ACCESS_FLAG_SHARE_READ | FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_WRITE;
-
-    stdin_handle  = w32_process_resolve_std_handles(scratch, &sa, params->stdin_access_flags, params->stdin_path, nul_handle, STD_INPUT_HANDLE, inherit_handles);
-    stdout_handle = w32_process_resolve_std_handles(scratch, &sa, params->stdout_access_flags, params->stdout_path, nul_handle, STD_OUTPUT_HANDLE, inherit_handles);
-    stderr_handle = w32_process_resolve_std_handles(scratch, &sa, params->stderr_access_flags, params->stderr_path, nul_handle, STD_ERROR_HANDLE, inherit_handles);
-
-    si.hStdInput  = stdin_handle;
-    si.hStdOutput = stdout_handle;
-    si.hStdError  = stderr_handle;
-
-    if (stdin_handle != INVALID_HANDLE_VALUE || stdout_handle != INVALID_HANDLE_VALUE || stderr_handle != INVALID_HANDLE_VALUE || nul_handle != INVALID_HANDLE_VALUE)
-        inherit_handles = 1;
-
-    success = CreateProcessW(0, cmd_line.data, 0, 0, inherit_handles, flags, 0, 0, &si, &pi);
-
-    if (stdin_handle  != INVALID_HANDLE_VALUE)  CloseHandle(stdin_handle);
-    if (stdout_handle != INVALID_HANDLE_VALUE)  CloseHandle(stdout_handle);
-    if (stderr_handle != INVALID_HANDLE_VALUE)  CloseHandle(stderr_handle);
-    if (nul_handle    != INVALID_HANDLE_VALUE)  CloseHandle(nul_handle);
-
-    if (success) {
-        process_id = pi.dwProcessId;
-
-        if (!params->run_detached)
+        if (params->wait || !params->run_detached)
             WaitForSingleObject(pi.hProcess, INFINITE);
 
         CloseHandle(pi.hThread);
         CloseHandle(pi.hProcess);
     }
 
-    arena_scratch_release(scratch);
+    done:
 
-    return process_id;
+    if (stdin_own)      CloseHandle(stdin_handle);
+    if (stdout_own)     CloseHandle(stdout_handle);
+    if (stderr_own)     CloseHandle(stderr_handle);
+
+    return pi.dwProcessId;
 }

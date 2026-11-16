@@ -73,6 +73,5 @@ internal DWORD w32_thread_entrypoint(void* ptr);
 
 internal U32 w32_sleep_ms_from_end_us(U64 end_us);
 
-internal HANDLE w32_process_resolve_std_handles(Arena* arena, SECURITY_ATTRIBUTES* sa, FileAccessFlag flags, Str8 path, HANDLE nul, DWORD std_id, BOOL inherit);
-
+internal HANDLE w32_process_resolve_std_handle(Arena* arena, Str8 path, FileAccessFlag access_flags);
 #endif /* W32_BASE_H */
