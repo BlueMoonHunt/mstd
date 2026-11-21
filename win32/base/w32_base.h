@@ -8,6 +8,7 @@
 #pragma comment(lib, "shell32")
 
 #define W32_FILE_WATCHER_NOTIFICATION_BUFFER_SIZE KB(8)
+#define WIN32_TO_UNIX_EPOCH_TICKS 116444736000000000ULL
 
 typedef struct W32_FileWatcher W32_FileWatcher;
 struct W32_FileWatcher {
@@ -64,6 +65,8 @@ struct W32_State {
 global W32_State w32_state;
 global thread_var HANDLE w32_thread_timer;
 
+#define w32_handle_is_valid(handle) (handle != INVALID_HANDLE_VALUE)
+
 internal void w32_file_access_flags_parse(FileAccessFlag flags, DWORD* access_flags, DWORD* share_mode, DWORD* creation_flags);
 
 internal W32_Entity* w32_entity_alloc(W32_EntityType type);
@@ -74,4 +77,5 @@ internal DWORD w32_thread_entrypoint(void* ptr);
 internal U32 w32_sleep_ms_from_end_us(U64 end_us);
 
 internal HANDLE w32_process_resolve_std_handle(Arena* arena, Str8 path, FileAccessFlag access_flags);
+
 #endif /* W32_BASE_H */

@@ -127,6 +127,7 @@ global read_only align_to(64) U8 CHAR_LUT[256] = {
 
 /* String Constructors */
 #define str8_lit(S) (Str8){.size = (sizeof(S) / sizeof((*S))) - 1, .data = (U8*)(S)}
+#define S(S) str8_lit(S)
 #define str8(S) str8_from_cstr(S)
 
 internal Str8 str8_from_cstr(char* str);

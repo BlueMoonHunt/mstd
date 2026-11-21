@@ -59,7 +59,7 @@ internal void w32_process_info_fetch(void) {
 
     if (char_count) {
         path_cwd = str16_from_size(scratch, char_count - 1);
-        path_cwd.size = GetCurrentDirectoryW(path_cwd.size, path_cwd.data);
+        path_cwd.size = GetCurrentDirectoryW(char_count, path_cwd.data);
         path_cwd.data[path_cwd.size] = 0;
     }
     else {
@@ -75,43 +75,11 @@ internal void w32_process_info_fetch(void) {
 }
 
 internal void os_state_init(void) {
-    SYSTEM_INFO sys_info;
-    LARGE_INTEGER resolution;
-    Arena* scratch;
-    U32 buffer_size;
-    Str16 path_cwd;
-    Str16 path_bin;
-
-    GetSystemInfo(&sys_info);
-    w32_state.system.page_size                  = sys_info.dwPageSize;
-    w32_state.system.large_page_size            = GetLargePageMinimum();
-    w32_state.system.logical_processor_count    = sys_info.dwNumberOfProcessors;
-    w32_state.system.allocation_granularity     = sys_info.dwAllocationGranularity;
-
-    w32_state.system.microsecond_resolution = 1;
-    if (QueryPerformanceFrequency(&resolution))
-        w32_state.system.microsecond_resolution = resolution.QuadPart;
+    w32_system_info_fetch();
 
     w32_state.arena = arena_alloc();
 
-    scratch     = arena_scratch_alloc();
-    buffer_size = KB(32);
-
-    path_bin                        = str16_from_size(scratch, buffer_size - 1);
-    path_bin.size                   = GetModuleFileNameW(0, path_bin.data, buffer_size);
-    path_bin.data[path_bin.size]    = 0;
-
-    path_cwd                        = str16_from_size(scratch, buffer_size - 1);
-    path_cwd.size                   = GetCurrentDirectoryW(path_cwd.size, path_cwd.data);
-    path_cwd.data[path_cwd.size]    = 0;
-
-    w32_state.process.bin_path                   = str8_from_str16(w32_state.arena, path_bin);
-    w32_state.process.id                         = GetCurrentProcessId();
-    w32_state.process.current_working_directory  = str8_from_str16(w32_state.arena, path_cwd);
-
-    InitializeCriticalSection(&w32_state.entity_mutex);
-
-    arena_scratch_release(scratch);
+    w32_process_info_fetch(); /* requires arena which requires system_info */
 }
 
 internal SystemInfo* system_info(void) {
@@ -383,7 +351,7 @@ internal Handle semaphore_create(U32 initial_count, U32 max_count, Str8 name) {
     Handle semaphore;
 
     arena_scratch_scope(arena) {
-        name_16             = str16_from_str8(arena, name);
+        name_16             = str16_nt(arena, str16_from_str8(arena, name));
         semaphore.val[0]    = (U64)CreateSemaphoreW(0, initial_count, max_count, (WCHAR*)name_16.data);
     }
 
@@ -400,7 +368,7 @@ internal Handle semaphore_open(Str8 name) {
     Handle semaphore;
 
     arena_scratch_scope(arena) {
-        name_16             = str16_from_str8(arena, name);
+        name_16             = str16_nt(arena, str16_from_str8(arena, name));
         semaphore.val[0]    = (U64)OpenSemaphoreW(SEMAPHORE_ALL_ACCESS, 0, (WCHAR*)name_16.data);
     }
 
@@ -513,7 +481,7 @@ internal U32 file_delete(Str8 path) {
 
     sleep_us    = 500;
     arena       = arena_scratch_alloc();
-    path_16     = str16_from_str8(arena, path);
+    path_16     = str16_nt(arena,str16_from_str8(arena, path));
 
     for_each_index(i, FILE_MAX_RETRIES) {
         if (DeleteFileW(path_16.data))
@@ -600,7 +568,7 @@ internal U32 file_exists(Str8 path) {
     U32 exists;
 
     arena       = arena_scratch_alloc();
-    path_16     = str16_from_str8(arena, path);
+    path_16     = str16_nt(arena, str16_from_str8(arena, path));
     attributes  = GetFileAttributesW(path_16.data);
     exists      = (attributes != INVALID_FILE_ATTRIBUTES) && !!(~attributes & FILE_ATTRIBUTE_DIRECTORY);
 
@@ -616,7 +584,7 @@ internal U32 file_directory_exists(Str8 path) {
     U32 exists;
 
     arena   = arena_scratch_alloc();
-    path_16 = str16_from_str8(arena, path);
+    path_16 = str16_nt(arena, str16_from_str8(arena, path));
 
 
     attributes  = GetFileAttributesW(path_16.data);
@@ -895,17 +863,107 @@ internal void file_watcher_destroy(Handle watcher) {
 
 internal U64 ticks_now(void) {
     LARGE_INTEGER counter;
-    QueryPerformanceCounter(&counter);
-    return (U64)(counter.QuadPart);
+    U64 result;
+
+    result = 0;
+
+    if (QueryPerformanceCounter(&counter)) {
+        result = (U64)counter.QuadPart;
+    }
+
+    return result;
+}
+
+internal U64 time_now_ns(void) {
+    U64 ticks;
+    U64 freq;
+    U64 result;
+
+    ticks   = ticks_now();
+    freq    = system_info()->microsecond_resolution;
+    result  = ((ticks / freq) * 1000000000ULL) + (((ticks % freq) * 1000000000ULL) / freq);
+
+    return result;
 }
 
 internal U64 time_now_us(void) {
+    U64 ticks;
+    U64 freq;
     U64 result;
-    LARGE_INTEGER counter;
 
-    result = 0;
-    if (QueryPerformanceCounter(&counter))
-        result = (counter.QuadPart * 1000000) / system_info()->microsecond_resolution;
+    ticks   = ticks_now();
+    freq    = system_info()->microsecond_resolution;
+    result  = ((ticks / freq) * 1000000ULL) + (((ticks % freq) * 1000000ULL) / freq);
+
+    return result;
+}
+
+internal F64 time_now_ms(void) {
+    U64 ticks;
+    F64 result;
+
+    ticks   = ticks_now();
+    result  = ((F64)ticks * 1000.0) / (F64)system_info()->microsecond_resolution;
+
+    return result;
+}
+
+internal F64 time_now_sec(void) {
+    U64 ticks;
+    F64 result;
+
+    ticks   = ticks_now();
+    result  = (F64)ticks / (F64)system_info()->microsecond_resolution;
+
+    return result;
+}
+
+internal U64 ticks_now_unix(void) {
+    FILETIME ft;
+    U64 ticks;
+
+    GetSystemTimePreciseAsFileTime(&ft);
+    ticks = ((U64)ft.dwHighDateTime << 32) | (U64)ft.dwLowDateTime;
+
+    return ticks - WIN32_TO_UNIX_EPOCH_TICKS;
+}
+
+internal U64 time_now_unix_ns(void) {
+    U64 ticks;
+    U64 result;
+
+    ticks   = ticks_now_unix();
+    result  = ticks * 100ULL;
+
+    return result;
+}
+
+internal U64 time_now_unix_us(void) {
+    U64 ticks;
+    U64 result;
+
+    ticks   = ticks_now_unix();
+    result  = ticks / 10ULL;
+
+    return result;
+}
+
+internal F64 time_unix_ms(void) {
+    U64 ticks;
+    F64 result;
+
+    ticks   = ticks_now_unix();
+    result  = (F64)ticks / 10000.0;
+
+    return result;
+}
+
+internal F64 time_unix_sec(void) {
+    U64 ticks;
+    F64 result;
+
+    ticks   = ticks_now_unix();
+    result  = (F64)ticks / 10000000.0;
 
     return result;
 }
@@ -937,7 +995,7 @@ internal Handle lib_load_(Str8 lib_name) {
     Arena* arena;
 
     arena = arena_scratch_alloc();
-    name16 = str16_from_str8(arena, lib_name);
+    name16 = str16_nt(arena, str16_from_str8(arena, lib_name));
     handle.val[0] = (U64)LoadLibraryW((LPWSTR)name16.data);
     arena_scratch_release(arena);
 
@@ -991,6 +1049,19 @@ internal HANDLE w32_process_resolve_std_handle(Arena* arena, Str8 path, FileAcce
     return handle;
 }
 
+internal HANDLE w32_process_open_nul(U32 is_write) {
+    SECURITY_ATTRIBUTES sa;
+    DWORD access;
+
+    mem_zero_type(&sa);
+    sa.nLength              = sizeof(sa);
+    sa.bInheritHandle       = TRUE;
+    sa.lpSecurityDescriptor = 0;
+
+    access = is_write ? GENERIC_WRITE : GENERIC_READ;
+    return CreateFileW(L"NUL", access, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+}
+
 internal U32 process_create_(ProcessCreateParams* params) {
     Arena* scratch;
     Str8 header;
@@ -1005,6 +1076,7 @@ internal U32 process_create_(ProcessCreateParams* params) {
     U8 stdout_own;
     U8 stderr_own;
     U8 redirect;
+    U8 bind_handles;
 
     mem_zero_type(&si);
     mem_zero_type(&pi);
@@ -1012,8 +1084,9 @@ internal U32 process_create_(ProcessCreateParams* params) {
     stdin_own       = 0;
     stdout_own      = 0;
     stderr_own      = 0;
-    flags           = 0;
+    flags           = CREATE_UNICODE_ENVIRONMENT;
     redirect        = !!(params->stdin_path.size | params->stdout_path.size | params->stderr_path.size);
+    bind_handles    = !!(params->inherit_handles || redirect || params->hidden);
     si.cb           = sizeof si;
     si.dwFlags      = 0;
     stdin_handle    = INVALID_HANDLE_VALUE;
@@ -1022,44 +1095,71 @@ internal U32 process_create_(ProcessCreateParams* params) {
 
     scratch = arena_scratch_alloc();
 
-    header  = (params->cmd_header.size) ? params->cmd_header : str8_lit("cmd.exe /c ");
-    cmd     = str16_from_str8(scratch, str8_concat(scratch, header, params->cmd_line));
-    cmd     = str16_nt(scratch, cmd);
+    if (params->strip_default_header) {
+        cmd = str16_from_str8(scratch, params->cmd_line);
+    }
+    else {
+        header = str8_lit("powershell.exe -NoProfile -NonInteractive -Command ");
+        cmd = str16_from_str8(scratch, str8_concat(scratch, header, params->cmd_line));
+    }
+
+    cmd = str16_nt(scratch, cmd);
 
     if (params->stdin_path.size) {
-        stdin_handle = w32_process_std_handle(scratch, params->stdin_path, params->stdin_access_flags | FILE_ACCESS_FLAG_SHARE_READ | FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_READ);
+        stdin_handle = w32_process_resolve_std_handle(scratch, params->stdin_path, params->stdin_access_flags | FILE_ACCESS_FLAG_SHARE_READ | FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_READ);
 
-        if (stdin_handle != INVALID_HANDLE_VALUE)
+        if (w32_handle_is_valid(stdin_handle))
             stdin_own = 1;
         else
             goto done;
     }
 
     if (params->stdout_path.size) {
-        stdout_handle = w32_process_std_handle(scratch, params->stdout_path, params->stdout_access_flags | FILE_ACCESS_FLAG_SHARE_READ | FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_WRITE);
+        stdout_handle = w32_process_resolve_std_handle(scratch, params->stdout_path, params->stdout_access_flags | FILE_ACCESS_FLAG_SHARE_READ | FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_WRITE);
 
-        if (stdout_handle != INVALID_HANDLE_VALUE)
+        if (w32_handle_is_valid(stdout_handle))
             stdout_own = 1;
         else
             goto done;
     }
 
-    if (params->stderr_path.size && !str8_match(params->stdout_path, params->stderr_path, STR8_MATCH_FLAG_CASE_INSENSITIVE)) {
-        w32_process_std_handle(scratch, params->stderr_path, params->stdout_access_flags | FILE_ACCESS_FLAG_SHARE_READ | FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_WRITE);
+    if (params->stderr_path.size) {
+        if (str8_match(params->stdout_path, params->stderr_path, STR8_MATCH_FLAG_CASE_INSENSITIVE))
+            stderr_handle = stdout_handle;
+        else {
+            stderr_handle = w32_process_resolve_std_handle(scratch, params->stderr_path, params->stdout_access_flags | FILE_ACCESS_FLAG_SHARE_READ | FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_WRITE);
 
-        if (stderr_handle != INVALID_HANDLE_VALUE)
-            stderr_own = 1;
-        else
-            goto done;
-    }
-    else {
-        stderr_handle = stdout_handle;
+            if (w32_handle_is_valid(stderr_handle))
+                stderr_own = 1;
+            else
+                goto done;
+        }
     }
 
-    if (params->inherit_handles || redirect) {
-        if (stdin_handle == INVALID_HANDLE_VALUE)       stdin_handle = GetStdHandle(STD_INPUT_HANDLE);
-        if (stdout_handle == INVALID_HANDLE_VALUE)      stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE);
-        if (stderr_handle == INVALID_HANDLE_VALUE)      stderr_handle = GetStdHandle(STD_ERROR_HANDLE);
+    if (bind_handles) {
+        if (!w32_handle_is_valid(stdin_handle)) {
+            stdin_handle = params->inherit_handles ? GetStdHandle(STD_INPUT_HANDLE) : INVALID_HANDLE_VALUE;
+            if (!w32_handle_is_valid(stdin_handle)) {
+                stdin_handle    = w32_process_open_nul(0);
+                stdin_own       = w32_handle_is_valid(stdin_handle);
+            }
+        }
+
+        if (!w32_handle_is_valid(stdout_handle)) {
+            stdout_handle = params->inherit_handles ? GetStdHandle(STD_OUTPUT_HANDLE) : INVALID_HANDLE_VALUE;
+            if (!w32_handle_is_valid(stdout_handle)) {
+                stdout_handle   = w32_process_open_nul(1);
+                stdout_own      = w32_handle_is_valid(stdout_handle);
+            }
+        }
+
+        if (!w32_handle_is_valid(stderr_handle)) {
+            stderr_handle = params->inherit_handles ? GetStdHandle(STD_ERROR_HANDLE) : INVALID_HANDLE_VALUE;
+            if (!w32_handle_is_valid(stderr_handle)) {
+                stderr_handle   = w32_process_open_nul(1);
+                stderr_own      = w32_handle_is_valid(stderr_handle);
+            }
+        }
 
         si.dwFlags      |= STARTF_USESTDHANDLES;
         si.hStdInput    = stdin_handle;
@@ -1070,13 +1170,14 @@ internal U32 process_create_(ProcessCreateParams* params) {
     if (params->hidden) {
         si.dwFlags      |= STARTF_USESHOWWINDOW;
         si.wShowWindow  = SW_HIDE;
+        flags           |= CREATE_NO_WINDOW;
+
+        if (params->run_detached)
+            flags |= CREATE_NEW_PROCESS_GROUP;
     }
-
-    if (params->hidden)
-        flags |= CREATE_NO_WINDOW;
-
-    if (params->run_detached)
-        flags |= DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP;
+    else if (params->run_detached) {
+        flags |= CREATE_NEW_CONSOLE | CREATE_NEW_PROCESS_GROUP;
+    }
 
     switch (params->priority) {
         case PROCESS_PRIORITY_NORMAL:   { flags |= NORMAL_PRIORITY_CLASS; } break;
@@ -1085,9 +1186,7 @@ internal U32 process_create_(ProcessCreateParams* params) {
         case PROCESS_PRIORITY_REALTIME: { flags |= REALTIME_PRIORITY_CLASS; } break;
     }
 
-    if (CreateProcess(0, cmd.data, 0, 0, (params->inherit_handles || redirect) ? TRUE : FALSE, flags, 0, 0, &si, &pi)) {
-        pi.dwProcessId = pi.dwProcessId;
-
+    if (CreateProcessW(0, cmd.data, 0, 0, bind_handles ? TRUE : FALSE, flags, 0, 0, &si, &pi)) {
         if (params->wait || !params->run_detached)
             WaitForSingleObject(pi.hProcess, INFINITE);
 
@@ -1095,8 +1194,7 @@ internal U32 process_create_(ProcessCreateParams* params) {
         CloseHandle(pi.hProcess);
     }
 
-    done:
-
+done:
     if (stdin_own)      CloseHandle(stdin_handle);
     if (stdout_own)     CloseHandle(stdout_handle);
     if (stderr_own)     CloseHandle(stderr_handle);
