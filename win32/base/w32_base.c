@@ -626,8 +626,19 @@ internal void w32_file_access_flags_parse(FileAccessFlag flags, DWORD* access_fl
         creation = OPEN_ALWAYS;
     }
     else if (flags & FILE_ACCESS_FLAG_WRITE) {
-        access  |= GENERIC_WRITE;
-        creation = CREATE_ALWAYS;
+        access |= GENERIC_WRITE;
+        if (flags & FILE_ACCESS_FLAG_CREATE_ALWAYS) {
+            creation = CREATE_ALWAYS;
+        }
+        else if (flags & FILE_ACCESS_FLAG_OPEN_ALWAYS) {
+            creation = OPEN_ALWAYS;
+        }
+        else if (flags & FILE_ACCESS_FLAG_OPEN_EXISTING) {
+            creation = OPEN_EXISTING;
+        }
+        else {
+            creation = CREATE_ALWAYS;
+        }
     }
 
     *access_flags   = access;

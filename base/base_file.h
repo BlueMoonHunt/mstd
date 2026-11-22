@@ -1,17 +1,25 @@
 #if !defined(BASE_FILE_H)
 #define BASE_FILE_H
 
-typedef U8 FileAccessFlag;
+typedef U32 FileAccessFlag;
 
 enum {
-    FILE_ACCESS_FLAG_OPEN_EXISTING  = 0,
-    FILE_ACCESS_FLAG_OPEN_ALWAYS    = 1 << 0,
-    FILE_ACCESS_FLAG_SHARE_READ     = 1 << 1,
-    FILE_ACCESS_FLAG_SHARE_WRITE    = 1 << 2,
-    FILE_ACCESS_FLAG_EXECUTE        = 1 << 3,
-    FILE_ACCESS_FLAG_READ           = 1 << 5,
-    FILE_ACCESS_FLAG_WRITE          = 1 << 6,
-    FILE_ACCESS_FLAG_APPEND         = 1 << 7
+    FILE_ACCESS_FLAG_OPEN_EXISTING  = 1 << 0,
+    FILE_ACCESS_FLAG_CREATE_ALWAYS  = 1 << 1,
+    FILE_ACCESS_FLAG_OPEN_ALWAYS    = 1 << 2,
+    FILE_ACCESS_FLAG_SHARE_READ     = 1 << 3,
+    FILE_ACCESS_FLAG_SHARE_WRITE    = 1 << 5,
+    FILE_ACCESS_FLAG_EXECUTE        = 1 << 6,
+    FILE_ACCESS_FLAG_READ           = 1 << 7,
+    FILE_ACCESS_FLAG_WRITE          = 1 << 8,
+    FILE_ACCESS_FLAG_APPEND         = 1 << 9,
+    FILE_ACCESS_FLAG_SHARE_RW       = FILE_ACCESS_FLAG_SHARE_WRITE | FILE_ACCESS_FLAG_SHARE_READ,
+    FILE_ACCESS_FLAG_RW             = FILE_ACCESS_FLAG_READ | FILE_ACCESS_FLAG_WRITE,
+};
+
+typedef struct FileInfo FileInfo;
+struct FileInfo {
+    U64 size;
 };
 
 #define FILE_MAX_RETRIES 5
@@ -28,9 +36,9 @@ internal void file_close(Handle file);
 internal void file_write(Handle file, void* data, U64 size, U64 offset);
 internal Str8 file_read(Arena* arena, Handle file, U64 size, U64 offset);
 
-#define file_read_struct(arena, file, T, offset) (T*)os_file_read(arena, file, sizeof(T), offset)
-#define file_write_struct(file, struct_ptr, offset) os_file_write(file, struct_ptr, offset, sizeof(*struct_ptr))
-#define file_write_string(file, str) os_file_write(file, str.data, 0, str.size)
+#define file_read_struct(arena, file, T, offset) (T*)file_read((arena), (file), sizeof(T), (offset))
+#define file_write_struct(file, struct_ptr, offset) file_write((file), (struct_ptr), sizeof(*(struct_ptr)), (offset))
+#define file_write_string(file, str) file_write((file), (str).data, (str).size, 0)
 
 /* FileWatcher */
 
