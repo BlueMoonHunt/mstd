@@ -230,7 +230,8 @@ internal Str8 str8_from_fmt(Arena* arena, char* fmt, ...) {
     va_list args_copy;
     I32 length;
 
-    result = (Str8){0};
+    result.data = 0;
+    result.size = 0;
 
     va_start(args, fmt);
 
@@ -240,7 +241,7 @@ internal Str8 str8_from_fmt(Arena* arena, char* fmt, ...) {
 
     if (length) {
         result = str8_from_size(arena, length);
-        vsnprintf((char*)result.data, result.size, fmt, args);
+        vsnprintf((char*)result.data, result.size + 1, fmt, args);
     }
 
     va_end(args);
