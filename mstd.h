@@ -16,7 +16,7 @@ int mstd_main(int argc, char* argv[]);
 #define main(...)                       \
     main(int argc, char* argv[]) {      \
         int result;                     \
-        os_state_init();                \
+        base_init();                \
         result = mstd_main(argc, argv); \
         return result;                  \
     }                                   \

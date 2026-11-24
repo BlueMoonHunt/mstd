@@ -248,6 +248,28 @@ internal Str8 str8_from_fmt(Arena* arena, char* fmt, ...) {
     return result;
 }
 
+internal Str8 str8_from_str8_node_sll(Arena* arena, Str8Node* head) {
+    Str8Node* node;
+    Str8 str;
+    U64 offset;
+
+    str.size    = 0;
+    offset      = 0;
+
+    for_each_node(node, head) {
+        str.size += node->data.size;
+    }
+
+    str = str8_from_size(arena, str.size);
+
+    for_each_node(node, head) {
+        mem_copy(str.data + offset, node->data.data, node->data.size);
+        offset += node->data.size;
+    }
+
+    return str;
+}
+
 internal U32 str8_match(Str8 a, Str8 b, Str8MatchFlag flags) {
     U32 match;
     U64 i;

@@ -32,4 +32,6 @@
 #include "../win32/base/w32_base.h"
 #endif
 
+#define base_init os_state_init
+
 #endif /* BASE_H */
