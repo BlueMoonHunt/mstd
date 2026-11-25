@@ -7,6 +7,7 @@
 #include "base_time.c"
 #include "base_ring_buffer.c"
 #include "base_process.c"
+#include "base_cli.c"
 
 #if OS_WINDOWS
 #include "../win32/base/w32_base.c"

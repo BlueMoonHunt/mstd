@@ -1023,7 +1023,7 @@ internal void lib_unload(Handle lib) {
 
 /* Process */
 
-internal void process_cli_attach(U32 if_exists) {
+internal void cli_attach(U32 if_exists) {
     if (if_exists ? AllocConsole() : AttachConsole(ATTACH_PARENT_PROCESS)) {
          FILE *dummy;
         freopen_s(&dummy, "CONOUT$", "w", stdout);

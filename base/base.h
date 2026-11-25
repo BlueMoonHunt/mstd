@@ -25,6 +25,7 @@
 #include "base_time.h"
 #include "base_ring_buffer.h"
 #include "base_process.h"
+#include "base_cli.h"
 
 #if OS_WINDOWS
 

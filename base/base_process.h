@@ -27,8 +27,6 @@ struct ProcessCreateParams {
     U8 strip_default_header;
 };
 
-internal void process_cli_attach(U32 if_exists);
-
 internal U32 process_create_(ProcessCreateParams* params);
 
 #define process_create(...) process_create_(&(ProcessCreateParams){.cmd_line = S("help"), __VA_ARGS__})
