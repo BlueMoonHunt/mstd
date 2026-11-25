@@ -1,8 +1,8 @@
 #if !defined(BASE_CORE_H)
 #define BASE_CORE_H
 
-#define CONCAT(a, b) CONCAT_IMPL(a, b)
 #define CONCAT_IMPL(a, b) a ## b
+#define CONCAT(a, b) CONCAT_IMPL(a, b)
 
 #define clamp_top(val, high) (((val) < (high)) ? (val) : (high))
 #define clamp_bottom(val, low) (((val) > (low)) ? (val) : (low))

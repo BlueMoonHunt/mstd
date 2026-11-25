@@ -74,7 +74,7 @@ internal void w32_process_info_fetch(void) {
     arena_scratch_release(scratch);
 }
 
-internal void os_state_init(void) {
+internal void base_init(void) {
     w32_system_info_fetch();
 
     w32_state.arena = arena_alloc();

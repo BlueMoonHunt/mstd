@@ -8,15 +8,23 @@
 #endif
 
 #include "base/base.h"
+#include "gfx/gfx.h"
 
-#if MSTD_USE_MAIN /* frces uses of only "int main(int argc, char* argv[])" startup */
+#if MSTD_USE_MAIN /* forces uses of only "int main(int argc, char* argv[])" startup */
+
+#if MSTD_NO_GFX
+#define mstd_gfx_init() ((void)0)
+#else
+#define mstd_gfx_init() gfx_init()
+#endif
 
 int mstd_main(int argc, char* argv[]);
 
 #define main(...)                       \
     main(int argc, char* argv[]) {      \
         int result;                     \
-        base_init();                \
+        base_init();                    \
+        mstd_gfx_init();                \
         result = mstd_main(argc, argv); \
         return result;                  \
     }                                   \

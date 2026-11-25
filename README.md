@@ -36,7 +36,7 @@ int main() {
     Arena* arena;
     int* numbers;
 
-    os_state_init();
+    base_init();
 
     arena = arena_alloc();
     numbers = arena_push_array(arena, int, 10);
@@ -60,7 +60,7 @@ int main() {
     Str8 world;
     Str8 greeting;
 
-    os_state_init();
+    base_init();
 
     arena = arena_alloc(.reserve_size = MB(1));
     hello = str8_from_cstr("Hello, ");
