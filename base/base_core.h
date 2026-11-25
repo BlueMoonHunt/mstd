@@ -38,8 +38,8 @@
 #define NPOS (U64)(-1)
 #define STRNPOS NPOS
 
-#define for_each_index(i, n)                                for (i = 0; i < n; i++)
-#define for_each_node_nt(node_ptr, list_ptr, next, tail)    for ((node_ptr) = (list_ptr)->head; (node_ptr) != 0; (node_ptr) = (node_ptr)->next)
-#define for_each_node(node_ptr, list_ptr)                   for_each_node_nt(node_ptr, list_ptr, next, tail) 
+#define for_each_index(i, n)                    for (i = 0; i < n; i++)
+#define for_each_node_n(node_ptr, head, next)   for ((node_ptr) = (head); (node_ptr) != 0; (node_ptr) = (node_ptr)->next)
+#define for_each_node(node_ptr, head)           for_each_node_n(node_ptr, head, next)
 
 #endif /* BASE_CORE_H */

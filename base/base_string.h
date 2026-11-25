@@ -20,6 +20,19 @@ struct Str8 {
     U64 size;
 };
 
+typedef struct Str8Node Str8Node;
+struct Str8Node {
+    Str8 data;
+    Str8Node* next;
+};
+
+typedef struct Str8NodeDLL Str8NodeDLL;
+struct Str8NodeDLL {
+    Str8 data;
+    Str8NodeDLL* next;
+    Str8NodeDLL* prev;
+};
+
 enum {
     CHAR_DIGIT_MASK = mask(4)
 };
@@ -135,6 +148,10 @@ internal Str8 str8_from_fmt(Arena* arena, char* fmt, ...);
 internal Str8 str8_from_str16(Arena* arena, Str16 str);
 internal Str8 str8_from_str32(Arena* arena, Str32 str);
 internal Str8 str8_from_size(Arena* arena, U64 size);
+internal Str8 str8_from_str8_node_sll(Arena* arena, Str8Node* head);
+
+#define str8_from_str8_node(arena, head) str8_from_str8_node_sll((arena), (Str8Node*)(head))
+
 internal Str8 str8_slice(Str8 str, U64 begin, U64 end);
 
 internal Str8 str8_nt(Arena* arena, Str8 str);
