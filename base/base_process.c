@@ -43,14 +43,14 @@ internal U32 cmd_run(Cmd* cmds, CmdFlag flags) {
 
     cmd_str.size = 0;
 
-    for_each_node(node, cmds) {
+    for_each_node(node, cmds->head) {
         cmd_str.size += node->data.size + 1;
     }
 
     cmd_str = str8_from_size(cmds->arena, cmd_str.size);
     cmd_str.size = 0;
 
-    for_each_node(node, cmds) {
+    for_each_node(node, cmds->head) {
         mem_copy(cmd_str.data + cmd_str.size, node->data.data, node->data.size);
         cmd_str.size += node->data.size;
         mem_copy(cmd_str.data + cmd_str.size, " ", 1);
